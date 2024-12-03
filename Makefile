@@ -82,6 +82,6 @@ MemoryTrackerState.fatbin: MemoryTrackerState.cu
 	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
 clean:
-	rm -f libMemoryTracker.so MemoryTrackerAccess.fatbin
+	rm -f *.so *.fatbin
 
 clobber: clean

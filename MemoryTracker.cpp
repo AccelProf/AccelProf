@@ -48,6 +48,8 @@ static MemoryAccessState* dMemAccessState = nullptr;
 static bool access_tracking_enabled = false;
 
 static std::map<uint64_t, MemoryRange> activeAllocations;
+static uint64_t max_memory_size_per_kernel = 0;
+
 
 static std::string GetMemoryRWString(uint32_t flags)
 {
@@ -59,6 +61,7 @@ static std::string GetMemoryRWString(uint32_t flags)
     else if (isWrite) {return "Write";}
     else {return "Unknown";}
 }
+
 
 static std::string GetMemoryTypeString(MemoryAccessType type)
 {
@@ -183,14 +186,18 @@ void LaunchEnd(
     } else {
         memset(hMemAccessState, 0, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
         sanitizerMemcpyDeviceToHost(hMemAccessState, hMemAccessTracker->state, sizeof(*hMemAccessState), hstream);
-        for (uint32_t i = 0; i < hMemAccessState->size; ++i)
-        {
+        size_t total_memory = 0;
+        for (uint32_t i = 0; i < hMemAccessState->size; ++i) {
             const auto& range = hMemAccessState->start_end[i];
             const auto& touch = hMemAccessState->touch[i];
-            std::cout << "  Memory range 0x" << std::hex << range.start << " - 0x" << range.end << std::dec << "  " << (int)touch << std::endl;
+            if (touch == 1) {
+                total_memory += range.end - range.start;
+            }
+            std::cout << "  Memory range 0x" << std::hex << range.start << " - 0x" << range.end << std::dec << "  " << (int)touch << "  " << range.end - range.start << std::endl;
         }
+
+        max_memory_size_per_kernel = std::max(max_memory_size_per_kernel, total_memory);
     }
-    
 }
 
 
@@ -271,7 +278,13 @@ void MemoryTrackerCallback(
 }
 
 
-void cleanup(void) {}
+void cleanup(void) {
+    std::cout << std::endl << std::endl 
+            << "Max memory size per kernel: "
+            << max_memory_size_per_kernel / 1024 / 1024 << " MB"
+            << " (" << max_memory_size_per_kernel << " bytes, "
+            << max_memory_size_per_kernel / 1024 / 1024 / 1024 << " GB)" << std::endl;
+}
 
 
 int InitializeInjection()
