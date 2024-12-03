@@ -1,0 +1,6 @@
+*.fatbin
+*.so
+run.sh
+
+.vscode/
+test/
