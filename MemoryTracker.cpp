@@ -35,13 +35,19 @@
 #include <memory>
 #include <vector>
 #include <cstring>
+#include <cassert>
 
 
 static MemoryAccessTracker* hMemAccessTracker = nullptr;
 static MemoryAccessTracker* dMemAccessTracker = nullptr;
 static MemoryAccess* hMemAccessBuffer = nullptr;
 static MemoryAccess* dMemAccessBuffer = nullptr;
-const static size_t MemoryBufferSize = 4;
+static MemoryAccessState* hMemAccessState = nullptr;
+static MemoryAccessState* dMemAccessState = nullptr;
+
+static bool access_tracking_enabled = false;
+
+static std::map<uint64_t, MemoryRange> activeAllocations;
 
 static std::string GetMemoryRWString(uint32_t flags)
 {
@@ -65,10 +71,15 @@ static std::string GetMemoryTypeString(MemoryAccessType type)
 void ModuleLoaded(CUmodule module, CUcontext context)
 {
     // Instrument user code!
-    if (SANITIZER_SUCCESS != sanitizerAddPatchesFromFile("MemoryTrackerPatches.fatbin", 0))
-    {
-        std::cerr << "Failed to load fatbin. Please check that it is in the current directory and contains the correct SM architecture" << std::endl;
+    SanitizerResult result;
+    if (access_tracking_enabled) {
+        result = sanitizerAddPatchesFromFile("MemoryTrackerAccess.fatbin", 0);
+    } else {
+        result = sanitizerAddPatchesFromFile("MemoryTrackerState.fatbin", 0);
     }
+
+    if (result != SANITIZER_SUCCESS)
+        std::cerr << "Failed to load fatbin. Please check that it is in the current directory and contains the correct SM architecture" << std::endl;
 
     sanitizerPatchInstructions(SANITIZER_INSTRUCTION_GLOBAL_MEMORY_ACCESS, module, "MemoryGlobalAccessCallback");
     sanitizerPatchInstructions(SANITIZER_INSTRUCTION_SHARED_MEMORY_ACCESS, module, "MemorySharedAccessCallback");
@@ -80,15 +91,21 @@ void ModuleLoaded(CUmodule module, CUcontext context)
     if (!dMemAccessTracker) {
         sanitizerAlloc(context, (void**)&dMemAccessTracker, sizeof(*dMemAccessTracker));
     }
-    if (!dMemAccessBuffer) {
+    if (!dMemAccessBuffer && access_tracking_enabled) {
         sanitizerAlloc(context, (void**)&dMemAccessBuffer, sizeof(MemoryAccess) * MemoryBufferSize);
+    }
+    if (!dMemAccessState && !access_tracking_enabled) {
+        sanitizerAlloc(context, (void**)&dMemAccessState, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
     }
 
     if (!hMemAccessTracker) {
         sanitizerAllocHost(context, (void**)&hMemAccessTracker, sizeof(*hMemAccessTracker));
     }
-    if (!hMemAccessBuffer) {
+    if (!hMemAccessBuffer && access_tracking_enabled) {
         sanitizerAllocHost(context, (void**)&hMemAccessBuffer, sizeof(MemoryAccess) * MemoryBufferSize);
+    }
+    if (!hMemAccessState && !access_tracking_enabled) {
+        sanitizerAllocHost(context, (void**)&hMemAccessState, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
     }
 }
 
@@ -105,7 +122,19 @@ void LaunchBegin(
 
     uint32_t num_threads = blockDims.x * blockDims.y * blockDims.z * gridDims.x * gridDims.y * gridDims.z;
 
-    sanitizerMemset(dMemAccessBuffer, 0, sizeof(MemoryAccess) * MemoryBufferSize, hstream);
+    if (access_tracking_enabled) {
+        sanitizerMemset(dMemAccessBuffer, 0, sizeof(MemoryAccess) * MemoryBufferSize, hstream);
+    } else {
+        memset(hMemAccessState, 0, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
+        for (const auto& range : activeAllocations)
+        {
+            hMemAccessState->start_end[hMemAccessState->size].start = range.second.start;
+            hMemAccessState->start_end[hMemAccessState->size].end = range.second.end;
+            hMemAccessState->size++;
+        }
+        sanitizerMemcpyHostToDeviceAsync(dMemAccessState, hMemAccessState, sizeof(*dMemAccessState), hstream);
+        hMemAccessTracker->state = dMemAccessState;
+    }
 
     hMemAccessTracker->currentEntry = 0;
     hMemAccessTracker->maxEntry = MemoryBufferSize;
@@ -125,29 +154,43 @@ void LaunchEnd(
     std::string functionName,
     Sanitizer_StreamHandle hstream)
 {
-    while (true)
-    {
-        sanitizerMemcpyDeviceToHost(hMemAccessTracker, dMemAccessTracker, sizeof(*dMemAccessTracker), hstream);
-        if (hMemAccessTracker->numThreads == 0) {
-            break;
+    // while (true)
+    // {
+    //     sanitizerMemcpyDeviceToHost(hMemAccessTracker, dMemAccessTracker, sizeof(*dMemAccessTracker), hstream);
+    //     if (hMemAccessTracker->numThreads == 0) {
+    //         break;
+    //     }
+    // }
+
+    sanitizerStreamSynchronize(hstream);
+    sanitizerMemcpyDeviceToHost(hMemAccessTracker, dMemAccessTracker, sizeof(*dMemAccessTracker), hstream);
+
+    if (access_tracking_enabled) {
+        uint32_t numEntries = std::min(hMemAccessTracker->currentEntry, hMemAccessTracker->maxEntry);
+        sanitizerMemcpyDeviceToHost(hMemAccessBuffer, hMemAccessTracker->accesses, sizeof(MemoryAccess) * numEntries, nullptr);
+        for (uint32_t i = 0; i < numEntries; ++i)
+        {
+            MemoryAccess& access = hMemAccessBuffer[i];
+
+            std::cout << "  [" << i << "] " << GetMemoryRWString(access.flags)
+                    << " access of " << GetMemoryTypeString(access.type)
+                    << " memory by thread (" << access.threadId.x
+                    << "," << access.threadId.y
+                    << "," << access.threadId.z
+                    << ") at address 0x" << std::hex << access.address << std::dec
+                    << " (size is " << access.accessSize << " bytes)" << std::endl;
+        }
+    } else {
+        memset(hMemAccessState, 0, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
+        sanitizerMemcpyDeviceToHost(hMemAccessState, hMemAccessTracker->state, sizeof(*hMemAccessState), hstream);
+        for (uint32_t i = 0; i < hMemAccessState->size; ++i)
+        {
+            const auto& range = hMemAccessState->start_end[i];
+            const auto& touch = hMemAccessState->touch[i];
+            std::cout << "  Memory range 0x" << std::hex << range.start << " - 0x" << range.end << std::dec << "  " << (int)touch << std::endl;
         }
     }
-
-    sanitizerMemcpyDeviceToHost(hMemAccessTracker, dMemAccessTracker, sizeof(*dMemAccessTracker), hstream);
-    uint32_t numEntries = std::min(hMemAccessTracker->currentEntry, hMemAccessTracker->maxEntry);
-    sanitizerMemcpyDeviceToHost(hMemAccessBuffer, hMemAccessTracker->accesses, sizeof(MemoryAccess) * numEntries, nullptr);
-    for (uint32_t i = 0; i < numEntries; ++i)
-    {
-        MemoryAccess& access = hMemAccessBuffer[i];
-
-        std::cout << "  [" << i << "] " << GetMemoryRWString(access.flags)
-                << " access of " << GetMemoryTypeString(access.type)
-                << " memory by thread (" << access.threadId.x
-                << "," << access.threadId.y
-                << "," << access.threadId.z
-                << ") at address 0x" << std::hex << access.address << std::dec
-                << " (size is " << access.accessSize << " bytes)" << std::endl;
-    }
+    
 }
 
 
@@ -171,11 +214,26 @@ void MemoryTrackerCallback(
                 case SANITIZER_CBID_RESOURCE_DEVICE_MEMORY_ALLOC:
                 {
                     auto *pModuleData = (Sanitizer_ResourceMemoryData *)cbdata;
+                    if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0) break;
+
+                    MemoryRange range;
+                    range.start = (uint64_t)pModuleData->address;
+                    range.end = range.start + pModuleData->size;
+                    activeAllocations.emplace(range.start, range);
+                    break;
                 }
                 case SANITIZER_CBID_RESOURCE_DEVICE_MEMORY_FREE:
                 {
                     auto *pModuleData = (Sanitizer_ResourceMemoryData *)cbdata;
-                    
+                    if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0) break;
+
+                    auto it = activeAllocations.find((uint64_t)pModuleData->address);
+                    assert(it != activeAllocations.end());
+                    if (it != activeAllocations.end())
+                    {
+                        activeAllocations.erase(it);
+                    }
+                    break;
                 }
                 default:
                     break;

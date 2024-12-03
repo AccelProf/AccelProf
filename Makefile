@@ -43,7 +43,7 @@ NVCC_FLAGS     := --fatbin --compile-as-tools-patch
 NVCC_FLAGS     += $(INCLUDE_FLAGS)
 
 ifeq ($(dbg),1)
-    NVCC_FLAGS += -g -G
+    # NVCC_FLAGS += -g -G
 	CXX_FLAGS  += -g -O0
 endif
 
@@ -70,15 +70,18 @@ GENCODE_FLAGS  += -gencode arch=compute_$(HIGHEST_SM),code=compute_$(HIGHEST_SM)
 # Target rules
 all: build
 
-build: libMemoryTracker.so MemoryTrackerPatches.fatbin
+build: libMemoryTracker.so MemoryTrackerAccess.fatbin MemoryTrackerState.fatbin
 
 libMemoryTracker.so: MemoryTracker.cpp
 	$(HOST_COMPILER) $(CXX_FLAGS) $(INCLUDE_FLAGS) $(LINK_FLAGS) -o $@ $< $(LINK_LIBS)
 
-MemoryTrackerPatches.fatbin: MemoryTrackerPatches.cu
+MemoryTrackerAccess.fatbin: MemoryTrackerAccess.cu
+	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
+MemoryTrackerState.fatbin: MemoryTrackerState.cu
 	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
 clean:
-	rm -f libMemoryTracker.so MemoryTrackerPatches.fatbin
+	rm -f libMemoryTracker.so MemoryTrackerAccess.fatbin
 
 clobber: clean

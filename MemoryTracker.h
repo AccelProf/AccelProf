@@ -31,6 +31,9 @@
 
 #include <vector_types.h>
 
+#define MAX_ACTIVE_ALLOCATIONS 2048
+#define MemoryBufferSize 1024
+
 enum class MemoryAccessType
 {
     Global,
@@ -48,6 +51,19 @@ struct MemoryAccess
     MemoryAccessType type;
 };
 
+
+struct MemoryRange{
+    uint64_t start;
+    uint64_t end;
+};
+
+
+struct MemoryAccessState{
+    uint32_t size;
+    MemoryRange start_end[MAX_ACTIVE_ALLOCATIONS];
+    uint8_t touch[MAX_ACTIVE_ALLOCATIONS];
+};
+
 // Main tracking structure that patches get as userdata
 struct MemoryAccessTracker
 {
@@ -55,4 +71,5 @@ struct MemoryAccessTracker
     uint32_t maxEntry;
     uint32_t numThreads;
     MemoryAccess* accesses;
+    MemoryAccessState* state;
 };
