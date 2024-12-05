@@ -49,6 +49,7 @@ static bool access_tracking_enabled = true;
 
 static std::map<uint64_t, MemoryRange> activeAllocations;
 static uint64_t max_memory_size_per_kernel = 0;
+static uint64_t total_memory_transactions = 0;
 
 
 static std::string GetMemoryRWString(uint32_t flags)
@@ -76,7 +77,7 @@ void ModuleLoaded(CUmodule module, CUcontext context)
     // Instrument user code!
     SanitizerResult result;
     if (access_tracking_enabled) {
-        result = sanitizerAddPatchesFromFile("MemoryTrackerAccess.fatbin", 0);
+        result = sanitizerAddPatchesFromFile("MemoryAccessCount.fatbin", 0);
     } else {
         result = sanitizerAddPatchesFromFile("MemoryTrackerState.fatbin", 0);
     }
@@ -121,7 +122,7 @@ void LaunchBegin(
     dim3 blockDims,
     dim3 gridDims)
 {
-    std::cout << std::endl << "Launch " << functionName << std::endl;
+    // std::cout << std::endl << "Launch " << functionName << std::endl;
 
     uint32_t num_threads = blockDims.x * blockDims.y * blockDims.z * gridDims.x * gridDims.y * gridDims.z;
 
@@ -143,6 +144,7 @@ void LaunchBegin(
     hMemAccessTracker->maxEntry = MEMORY_ACCESS_BUFFER_SIZE;
     hMemAccessTracker->numThreads = num_threads;
     hMemAccessTracker->accesses = dMemAccessBuffer;
+    hMemAccessTracker->accessCount = 0;
 
     sanitizerMemcpyHostToDeviceAsync(dMemAccessTracker, hMemAccessTracker, sizeof(*dMemAccessTracker), hstream);
 
@@ -167,6 +169,9 @@ void LaunchEnd(
 
     sanitizerStreamSynchronize(hstream);
     sanitizerMemcpyDeviceToHost(hMemAccessTracker, dMemAccessTracker, sizeof(*dMemAccessTracker), hstream);
+
+    // std::cout << "Memory accesses: " << hMemAccessTracker->accessCount << std::endl;
+    total_memory_transactions += hMemAccessTracker->accessCount;
 
     if (access_tracking_enabled) {
         uint32_t numEntries = std::min(hMemAccessTracker->currentEntry, hMemAccessTracker->maxEntry);
@@ -287,6 +292,7 @@ void cleanup(void) {
             << max_memory_size_per_kernel / 1024 / 1024 << " MB"
             << " (" << max_memory_size_per_kernel << " bytes, "
             << max_memory_size_per_kernel / 1024 / 1024 / 1024 << " GB)" << std::endl;
+    std::cout << "Total memory transactions: " << total_memory_transactions << std::endl;
 }
 
 
