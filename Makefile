@@ -65,20 +65,21 @@ $(foreach sm,$(SMS),$(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=sm_
 HIGHEST_SM     := $(lastword $(sort $(SMS)))
 GENCODE_FLAGS  += -gencode arch=compute_$(HIGHEST_SM),code=compute_$(HIGHEST_SM)
 
+PATCH_SRCS     := $(notdir $(wildcard *.cu))
+PATCH_FATBINS  := $(patsubst %.cu, %.fatbin, $(PATCH_SRCS))
+
+
 ################################################################################
 
 # Target rules
 all: build
 
-build: libMemoryTracker.so MemoryTrackerAccess.fatbin MemoryTrackerState.fatbin
+build: libMemoryTracker.so $(PATCH_FATBINS)
 
 libMemoryTracker.so: MemoryTracker.cpp
 	$(HOST_COMPILER) $(CXX_FLAGS) $(INCLUDE_FLAGS) $(LINK_FLAGS) -o $@ $< $(LINK_LIBS)
 
-MemoryTrackerAccess.fatbin: MemoryTrackerAccess.cu
-	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ -c $<
-
-MemoryTrackerState.fatbin: MemoryTrackerState.cu
+%.fatbin: %.cu
 	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
 clean:
