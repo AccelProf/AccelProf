@@ -29,24 +29,7 @@
 
 #include <sanitizer_patching.h>
 
-
-__device__ __forceinline__ uint32_t get_laneid() {
-  uint32_t laneid = 0;
-  asm volatile("mov.u32 %0, %laneid;" : "=r"(laneid));
-  return laneid;
-}
-
-__device__ __forceinline__ uint32_t ballot(int32_t predicate, uint32_t mask = 0xFFFFFFFF) {
-    uint32_t ret;
-#if (__CUDA_ARCH__ >= 300)
-#if (__CUDACC_VER_MAJOR__ >= 9)
-    ret = __ballot_sync(mask, predicate);
-#else
-    ret = __ballot(predicate);
-#endif
-#endif
-    return ret;
-}
+#include "gpu_utils.h"
 
 struct gpu_address_comparator {
     __device__
@@ -55,50 +38,6 @@ struct gpu_address_comparator {
     }
 };
 
-template <typename T>
-__device__ __forceinline__ T atomic_load(const T *addr) {
-    const volatile T *vaddr = addr;  // volatile to bypass cache
-    __threadfence();                 // for seq_cst loads. Remove for acquire semantics.
-    const T value = *vaddr;
-    // fence to ensure that dependent reads are correctly ordered
-    __threadfence();
-    return value;
-}
-
-template <typename T>
-__device__ __forceinline__ void atomic_store(T *addr, T value) {
-    volatile T *vaddr = addr;  // volatile to bypass cache
-    // fence to ensure that previous non-atomic stores are visible to other threads
-    __threadfence();
-    *vaddr = value;
-}
-
-template <typename T, typename C>
-__device__ __forceinline__ uint32_t map_upper_bound(T *map, T value, uint32_t len, C cmp) {
-    uint32_t low = 0;
-    uint32_t high = len;
-    uint32_t mid = 0;
-    while (low < high) {
-        mid = (high - low) / 2 + low;
-        if (cmp(map[mid], value)) {
-            low = mid + 1;
-        } else {
-            high = mid;
-        }
-    }
-    return low;
-}
-
-template <typename T, typename C>
-__device__ __forceinline__ uint32_t map_prev(T *map, T value, uint32_t len, C cmp) {
-    uint32_t pos = map_upper_bound<T, C>(map, value, len, cmp);
-    if (pos != 0) {
-        --pos;
-    } else {
-        pos = len;
-    }
-    return pos;
-}
 
 static __device__
 SanitizerPatchResult CommonCallback(

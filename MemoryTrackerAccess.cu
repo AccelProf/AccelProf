@@ -29,12 +29,7 @@
 
 #include <sanitizer_patching.h>
 
-
-__device__ __forceinline__ uint32_t get_laneid() {
-  uint32_t laneid = 0;
-  asm volatile("mov.u32 %0, %laneid;" : "=r"(laneid));
-  return laneid;
-}
+#include "gpu_utils.h"
 
 
 static __device__
