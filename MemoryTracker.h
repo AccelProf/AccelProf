@@ -32,7 +32,8 @@
 #include <vector_types.h>
 
 #define MAX_ACTIVE_ALLOCATIONS 2048
-#define MemoryBufferSize 1024
+#define MEMORY_ACCESS_BUFFER_SIZE 128
+#define GPU_WARP_SIZE 32
 
 enum class MemoryAccessType
 {
@@ -44,10 +45,10 @@ enum class MemoryAccessType
 // Information regarding a memory access
 struct MemoryAccess
 {
-    uint64_t address;
+    uint64_t addresses[GPU_WARP_SIZE];
     uint32_t accessSize;
     uint32_t flags;
-    dim3     threadId;
+    uint64_t warpId;
     MemoryAccessType type;
 };
 

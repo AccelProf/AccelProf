@@ -45,7 +45,7 @@ static MemoryAccess* dMemAccessBuffer = nullptr;
 static MemoryAccessState* hMemAccessState = nullptr;
 static MemoryAccessState* dMemAccessState = nullptr;
 
-static bool access_tracking_enabled = false;
+static bool access_tracking_enabled = true;
 
 static std::map<uint64_t, MemoryRange> activeAllocations;
 static uint64_t max_memory_size_per_kernel = 0;
@@ -95,7 +95,7 @@ void ModuleLoaded(CUmodule module, CUcontext context)
         sanitizerAlloc(context, (void**)&dMemAccessTracker, sizeof(*dMemAccessTracker));
     }
     if (!dMemAccessBuffer && access_tracking_enabled) {
-        sanitizerAlloc(context, (void**)&dMemAccessBuffer, sizeof(MemoryAccess) * MemoryBufferSize);
+        sanitizerAlloc(context, (void**)&dMemAccessBuffer, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE);
     }
     if (!dMemAccessState && !access_tracking_enabled) {
         sanitizerAlloc(context, (void**)&dMemAccessState, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
@@ -105,7 +105,7 @@ void ModuleLoaded(CUmodule module, CUcontext context)
         sanitizerAllocHost(context, (void**)&hMemAccessTracker, sizeof(*hMemAccessTracker));
     }
     if (!hMemAccessBuffer && access_tracking_enabled) {
-        sanitizerAllocHost(context, (void**)&hMemAccessBuffer, sizeof(MemoryAccess) * MemoryBufferSize);
+        sanitizerAllocHost(context, (void**)&hMemAccessBuffer, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE);
     }
     if (!hMemAccessState && !access_tracking_enabled) {
         sanitizerAllocHost(context, (void**)&hMemAccessState, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
@@ -126,7 +126,7 @@ void LaunchBegin(
     uint32_t num_threads = blockDims.x * blockDims.y * blockDims.z * gridDims.x * gridDims.y * gridDims.z;
 
     if (access_tracking_enabled) {
-        sanitizerMemset(dMemAccessBuffer, 0, sizeof(MemoryAccess) * MemoryBufferSize, hstream);
+        sanitizerMemset(dMemAccessBuffer, 0, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, hstream);
     } else {
         memset(hMemAccessState, 0, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
         for (const auto& range : activeAllocations)
@@ -140,7 +140,7 @@ void LaunchBegin(
     }
 
     hMemAccessTracker->currentEntry = 0;
-    hMemAccessTracker->maxEntry = MemoryBufferSize;
+    hMemAccessTracker->maxEntry = MEMORY_ACCESS_BUFFER_SIZE;
     hMemAccessTracker->numThreads = num_threads;
     hMemAccessTracker->accesses = dMemAccessBuffer;
 
@@ -177,11 +177,14 @@ void LaunchEnd(
 
             std::cout << "  [" << i << "] " << GetMemoryRWString(access.flags)
                     << " access of " << GetMemoryTypeString(access.type)
-                    << " memory by thread (" << access.threadId.x
-                    << "," << access.threadId.y
-                    << "," << access.threadId.z
-                    << ") at address 0x" << std::hex << access.address << std::dec
+                    << " memory by warp id " << access.warpId
                     << " (size is " << access.accessSize << " bytes)" << std::endl;
+                    for (uint32_t j = 0; j < GPU_WARP_SIZE; ++j)
+                    {
+                        if (access.addresses[j] == 0) {break;}
+                        std::cout << "0x" << std::hex << access.addresses[j] << std::dec << " ";
+                    }
+                    std::cout << std::endl;
         }
     } else {
         memset(hMemAccessState, 0, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);

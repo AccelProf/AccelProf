@@ -43,18 +43,37 @@ SanitizerPatchResult CommonCallback(
 {
     auto* pTracker = (MemoryAccessTracker*)userdata;
 
-    uint32_t old = atomicAdd(&(pTracker->currentEntry), 1);
+    uint32_t active_mask = __activemask();
+    uint32_t laneid = get_laneid();
+    uint32_t first_laneid = __ffs(active_mask) - 1;
 
-    // no more space!
-    if (old >= pTracker->maxEntry)
+    MemoryAccess* accesses = nullptr;
+    bool full = false;
+    if (laneid == first_laneid) {
+        uint32_t old = atomicAdd(&(pTracker->currentEntry), 1);
+
+        // no more space!
+        if (old >= pTracker->maxEntry)
+            full = true;
+
+        accesses = &pTracker->accesses[old];
+        accesses->warpId = get_warpid();
+        accesses->type = type;
+        accesses->accessSize = accessSize;
+        accesses->flags = flags;
+    }
+    
+    __syncwarp(active_mask);
+    
+    accesses = (MemoryAccess*) shfl((uint64_t)accesses, first_laneid, active_mask);
+    full = (bool) shfl(full, first_laneid, active_mask);
+    if (full) {
         return SANITIZER_PATCH_SUCCESS;
+    }
 
-    MemoryAccess& access = pTracker->accesses[old];
-    access.address = (uint64_t)(uintptr_t)ptr;
-    access.accessSize = accessSize;
-    access.flags = flags;
-    access.threadId = threadIdx;
-    access.type = type;
+    if (accesses) {
+        accesses->addresses[laneid] = (uint64_t)(uintptr_t)ptr;
+    }
 
     return SANITIZER_PATCH_SUCCESS;
 }
