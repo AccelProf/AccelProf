@@ -1,0 +1,3 @@
+[submodule "sanalyzer"]
+	path = sanalyzer
+	url = git@github.com:Lin-Mao/sanalyzer.git

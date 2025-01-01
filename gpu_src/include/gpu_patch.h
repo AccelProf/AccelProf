@@ -2,7 +2,6 @@
 
 #include <cstdint>
 
-#include <vector_types.h>
 
 #define MAX_ACTIVE_ALLOCATIONS 2048
 #define MEMORY_ACCESS_BUFFER_SIZE 128

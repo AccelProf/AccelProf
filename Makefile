@@ -40,8 +40,12 @@ LIB_DIR        := lib
 PATCH_DIR      := $(LIB_DIR)/gpu_patch
 PATCH_SRC_DIR  := gpu_src
 PATCH_FATBINS  := $(addprefix $(PATCH_DIR)/, $(patsubst %.cu, %.fatbin, $(notdir $(wildcard $(PATCH_SRC_DIR)/*.cu))))
+INCLUDE_FLAGS  += -I$(PATCH_SRC_DIR)/include
 
-INCLUDE_FLAGS  += -I$(PATCH_SRC_DIR)
+SANALYZER_DIR  := sanalyzer/sanalyzer/
+INCLUDE_FLAGS  += -I$(SANALYZER_DIR)/include
+LINK_FLAGS     += -L$(SANALYZER_DIR)/lib -Wl,-rpath=$(SANALYZER_DIR)/lib
+LINK_LIBS	   += -lsanalyzer
 
 ################################################################################
 
@@ -59,7 +63,7 @@ $(LIB_DIR)/libcompute_sanitizer.so: compute_sanitizer.cpp
 	$(CXX) $(CXX_FLAGS) $(INCLUDE_FLAGS) $(LINK_FLAGS) -o $@ $< $(LINK_LIBS)
 
 $(PATCH_DIR)/%.fatbin:$(PATCH_SRC_DIR)/%.cu
-	$(NVCC) $(NVCC_FLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+	$(NVCC) $(NVCC_FLAGS) -I$(PATCH_SRC_DIR)/include $(GENCODE_FLAGS) -o $@ -c $<
 
 clean:
 	rm -rf $(LIB_DIR)

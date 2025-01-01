@@ -1,6 +1,8 @@
 #include "gpu_patch.h"
 
+
 #include <sanitizer.h>
+#include <vector_types.h>
 
 #include <fstream>
 #include <iostream>
@@ -10,6 +12,8 @@
 #include <cstring>
 #include <cassert>
 
+#include "sanalyzer.h"
+
 
 static MemoryAccessTracker* hMemAccessTracker = nullptr;
 static MemoryAccessTracker* dMemAccessTracker = nullptr;
@@ -18,11 +22,9 @@ static MemoryAccess* dMemAccessBuffer = nullptr;
 static MemoryAccessState* hMemAccessState = nullptr;
 static MemoryAccessState* dMemAccessState = nullptr;
 
-static bool access_tracking_enabled = true;
+static SanitizerOptions_t sanitizer_options;
 
 static std::map<uint64_t, MemoryRange> activeAllocations;
-static uint64_t max_memory_size_per_kernel = 0;
-static uint64_t total_memory_transactions = 0;
 
 
 static std::string GetMemoryRWString(uint32_t flags)
@@ -49,10 +51,10 @@ void ModuleLoaded(CUmodule module, CUcontext context)
 {
     // Instrument user code!
     SanitizerResult result;
-    if (access_tracking_enabled) {
+    if (sanitizer_options.enable_access_tracking) {
         result = sanitizerAddPatchesFromFile("lib/gpu_patch/gpu_memory_access_count.fatbin", 0);
     } else {
-        result = sanitizerAddPatchesFromFile("lib/gpu_patch/gpu_kernel_touch.fatbin", 0);
+        result = sanitizerAddPatchesFromFile("lib/gpu_patch/gpu_memory_access_count.fatbin", 0);
     }
 
     if (result != SANITIZER_SUCCESS)
@@ -68,20 +70,20 @@ void ModuleLoaded(CUmodule module, CUcontext context)
     if (!dMemAccessTracker) {
         sanitizerAlloc(context, (void**)&dMemAccessTracker, sizeof(*dMemAccessTracker));
     }
-    if (!dMemAccessBuffer && access_tracking_enabled) {
+    if (!dMemAccessBuffer && sanitizer_options.enable_access_tracking) {
         sanitizerAlloc(context, (void**)&dMemAccessBuffer, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE);
     }
-    if (!dMemAccessState && !access_tracking_enabled) {
+    if (!dMemAccessState && !sanitizer_options.enable_access_tracking) {
         sanitizerAlloc(context, (void**)&dMemAccessState, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
     }
 
     if (!hMemAccessTracker) {
         sanitizerAllocHost(context, (void**)&hMemAccessTracker, sizeof(*hMemAccessTracker));
     }
-    if (!hMemAccessBuffer && access_tracking_enabled) {
+    if (!hMemAccessBuffer && sanitizer_options.enable_access_tracking) {
         sanitizerAllocHost(context, (void**)&hMemAccessBuffer, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE);
     }
-    if (!hMemAccessState && !access_tracking_enabled) {
+    if (!hMemAccessState && !sanitizer_options.enable_access_tracking) {
         sanitizerAllocHost(context, (void**)&hMemAccessState, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
     }
 }
@@ -99,7 +101,7 @@ void LaunchBegin(
 
     uint32_t num_threads = blockDims.x * blockDims.y * blockDims.z * gridDims.x * gridDims.y * gridDims.z;
 
-    if (access_tracking_enabled) {
+    if (sanitizer_options.enable_access_tracking) {
         sanitizerMemset(dMemAccessBuffer, 0, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, hstream);
     } else {
         memset(hMemAccessState, 0, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
@@ -122,6 +124,8 @@ void LaunchBegin(
     sanitizerMemcpyHostToDeviceAsync(dMemAccessTracker, hMemAccessTracker, sizeof(*dMemAccessTracker), hstream);
 
     sanitizerSetCallbackData(function, dMemAccessTracker);
+
+    yosemite_kernel_start_callback(functionName);
 }
 
 
@@ -143,42 +147,11 @@ void LaunchEnd(
     sanitizerStreamSynchronize(hstream);
     sanitizerMemcpyDeviceToHost(hMemAccessTracker, dMemAccessTracker, sizeof(*dMemAccessTracker), hstream);
 
-    // std::cout << "Memory accesses: " << hMemAccessTracker->accessCount << std::endl;
-    total_memory_transactions += hMemAccessTracker->accessCount;
 
-    if (access_tracking_enabled) {
-        uint32_t numEntries = std::min(hMemAccessTracker->currentEntry, hMemAccessTracker->maxEntry);
-        sanitizerMemcpyDeviceToHost(hMemAccessBuffer, hMemAccessTracker->accesses, sizeof(MemoryAccess) * numEntries, nullptr);
-        for (uint32_t i = 0; i < numEntries; ++i)
-        {
-            MemoryAccess& access = hMemAccessBuffer[i];
+    std::cout << "Kernel " << functionName << " has " << hMemAccessTracker->accessCount << " memory accesses." << std::endl;
 
-            std::cout << "  [" << i << "] " << GetMemoryRWString(access.flags)
-                    << " access of " << GetMemoryTypeString(access.type)
-                    << " memory by warp id " << access.warpId
-                    << " (size is " << access.accessSize << " bytes)" << std::endl;
-                    for (uint32_t j = 0; j < GPU_WARP_SIZE; ++j)
-                    {
-                        if (access.addresses[j] == 0) {break;}
-                        std::cout << "0x" << std::hex << access.addresses[j] << std::dec << " ";
-                    }
-                    std::cout << std::endl;
-        }
-    } else {
-        memset(hMemAccessState, 0, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
-        sanitizerMemcpyDeviceToHost(hMemAccessState, hMemAccessTracker->state, sizeof(*hMemAccessState), hstream);
-        size_t total_memory = 0;
-        for (uint32_t i = 0; i < hMemAccessState->size; ++i) {
-            const auto& range = hMemAccessState->start_end[i];
-            const auto& touch = hMemAccessState->touch[i];
-            if (touch == 1) {
-                total_memory += range.end - range.start;
-            }
-            std::cout << "  Memory range 0x" << std::hex << range.start << " - 0x" << range.end << std::dec << "  " << (int)touch << "  " << range.end - range.start << std::endl;
-        }
-
-        max_memory_size_per_kernel = std::max(max_memory_size_per_kernel, total_memory);
-    }
+    yosemite_gpu_data_analysis(hMemAccessTracker, hMemAccessTracker->accessCount);
+    yosemite_kernel_end_callback(functionName);
 }
 
 
@@ -203,24 +176,14 @@ void ComputeSanitizerCallback(
                 {
                     auto *pModuleData = (Sanitizer_ResourceMemoryData *)cbdata;
                     if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0) break;
-
-                    MemoryRange range;
-                    range.start = (uint64_t)pModuleData->address;
-                    range.end = range.start + pModuleData->size;
-                    activeAllocations.emplace(range.start, range);
+                    yosemite_alloc_callback(pModuleData->address, pModuleData->size, pModuleData->flags);
                     break;
                 }
                 case SANITIZER_CBID_RESOURCE_DEVICE_MEMORY_FREE:
                 {
                     auto *pModuleData = (Sanitizer_ResourceMemoryData *)cbdata;
                     if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0) break;
-
-                    auto it = activeAllocations.find((uint64_t)pModuleData->address);
-                    assert(it != activeAllocations.end());
-                    if (it != activeAllocations.end())
-                    {
-                        activeAllocations.erase(it);
-                    }
+                    yosemite_free_callback(pModuleData->address);
                     break;
                 }
                 default:
@@ -260,12 +223,7 @@ void ComputeSanitizerCallback(
 
 
 void cleanup(void) {
-    std::cout << std::endl << std::endl 
-            << "Max memory size per kernel: "
-            << max_memory_size_per_kernel / 1024 / 1024 << " MB"
-            << " (" << max_memory_size_per_kernel << " bytes, "
-            << max_memory_size_per_kernel / 1024 / 1024 / 1024 << " GB)" << std::endl;
-    std::cout << "Total memory transactions: " << total_memory_transactions << std::endl;
+    yosemite_terminate();
 }
 
 
@@ -275,6 +233,8 @@ int InitializeInjection()
     sanitizerSubscribe(&handle, ComputeSanitizerCallback, nullptr);
     sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_RESOURCE);
     sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_LAUNCH);
+
+    yosemite_init(sanitizer_options);
 
     return 0;
 }
