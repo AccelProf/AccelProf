@@ -1,0 +1,22 @@
+#!/bin/bash
+
+if [ -z "${CU_PROF_HOME}" ]; then
+    echo "Please set the environment variable CU_PROF_HOME to the root directory of the CUDA Profiling Tools."
+    exit 1
+fi
+
+if [ "$(pwd)" != "$CU_PROF_HOME" ]; then
+    echo "Please run this script from the directory where it is located."
+    exit 1
+fi
+
+cd $CU_PROF_HOME
+git submodule update --init --recursive
+
+cd $CU_PROF_HOME/sanalyzer
+make install SANITIZER_TOOL_DIR=$CU_PROF_HOME -j
+
+
+cd $CU_PROF_HOME
+make SANALYZER_DIR=$CU_PROF_HOME/sanalyzer -j
+

@@ -1,0 +1,112 @@
+#!/bin/bash
+
+# check if CUPROF_HOME is set
+if [ -z ${CU_PROF_HOME} ]; then
+    echo "CU_PROF_HOME is not set."
+    echo "Please set CU_PROF_HOME to the root directory of this repo."
+    exit 1
+fi
+
+function help_func()
+{
+    cat <<EOF
+Description: A collection of CUDA application profilers.
+Usage:
+    -h, --help
+        Print this help message.
+    -t <tool_name>
+        mem_trace: Trace memory access of CUDA kernels.
+        app_metric: Collect metrics for CUDA Applications.
+EOF
+    exit 0
+}
+
+function error_hint()
+{
+error_message=$1
+cat <<EOF
+${error_message}
+Tip: Use "cuprof -h" for more usage description.
+EOF
+    exit 1
+}
+
+# for debugging
+# set -x
+
+while [ -n "$1" ]
+do
+    arg="$1" ; shift
+    case "${arg}" in
+        -t)
+        export TOOL=$1
+        shift
+        ;;
+        -v)
+        export VERBOSE=1
+        ;;
+        -h)
+        help_func
+        break
+        ;;
+        * )
+        set -- "${arg}" "$@"
+        break
+        ;;
+    esac
+done
+
+EXECUTABLE=$1
+ARGS="${*:2}"
+
+if [ -z ${EXECUTABLE} ]
+then
+    error_hint "Specify the executable to run."
+fi
+
+if [ -z ${TOOL} ]
+then
+    error_hint "Specify tool via -t <tool_name>"
+fi
+
+
+if [ ! -z ${RESULT_DIR} ]
+then
+    echo "Result directory: ${RESULT_DIR}"
+else
+    export RESULT_DIR=.
+fi
+
+if [ ${EXECUTABLE} == "python" ] || [ ${EXECUTABLE} == "python3" ];
+then
+    export APP_NAME=$(basename $(echo $ARGS | cut -d' ' -f1) .py)
+    export YOSEMITE_TORCH_PROFILE=1
+else
+    export APP_NAME=${EXECUTABLE#./}
+    export YOSEMITE_TORCH_PROFILE=0
+fi
+
+if [ ! -z ${VERBOSE} ]
+then
+    export OUTPUT_REDIRECT=${RESULT_DIR}/${APP_NAME}.cuprof.log
+else
+    export OUTPUT_REDIRECT=/dev/null
+fi
+
+echo "${EXECUTABLE} ${ARGS}"
+
+# Profile the application with the specified tool
+if [ ${TOOL} == "mem_trace" ]
+then
+    export YOSEMITE_TOOL_NAME=mem_trace
+    echo "Tracing memory access of ${APP_NAME}..."
+elif [ ${TOOL} == "app_metric" ]
+then
+    export YOSEMITE_TOOL_NAME=app_metric
+    echo "Collecting metrics for ${APP_NAME}..."
+else
+    error_hint "Invalid tool name."
+fi
+
+
+LD_PRELOAD=${CU_PROF_HOME}/lib/libcompute_sanitizer.so ${EXECUTABLE} ${ARGS} &> ${OUTPUT_REDIRECT}

@@ -49,14 +49,22 @@ static std::string GetMemoryTypeString(MemoryAccessType type)
 
 void ModuleLoaded(CUmodule module, CUcontext context)
 {
-    // Instrument user code!
-    SanitizerResult result;
-    if (sanitizer_options.enable_access_tracking) {
-        result = sanitizerAddPatchesFromFile("lib/gpu_patch/gpu_memory_access_count.fatbin", 0);
-    } else {
-        result = sanitizerAddPatchesFromFile("lib/gpu_patch/gpu_memory_access_count.fatbin", 0);
+    const char* env_name = std::getenv("CU_PROF_HOME");
+    std::string patch_path;
+    if (env_name) {
+        patch_path = std::string(env_name) + "/lib/gpu_patch/";
     }
 
+    std::string fatbin_file;
+    if (sanitizer_options.enable_access_tracking) {
+        fatbin_file = patch_path + "gpu_memory_access_count.fatbin";
+    } else {
+        fatbin_file = patch_path + "gpu_memory_access_count.fatbin";
+    }
+
+    // Instrument user code!
+    SanitizerResult result;
+    result = sanitizerAddPatchesFromFile(fatbin_file.c_str(), 0);
     if (result != SANITIZER_SUCCESS)
         std::cerr << "Failed to load fatbin. Check its path and included SM architecture." << std::endl;
 
