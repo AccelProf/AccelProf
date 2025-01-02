@@ -57,9 +57,13 @@ void ModuleLoaded(CUmodule module, CUcontext context)
 
     std::string fatbin_file;
     if (sanitizer_options.enable_access_tracking) {
-        fatbin_file = patch_path + "gpu_memory_access_count.fatbin";
+        fatbin_file = patch_path + "gpu_memory_access.fatbin";
     } else {
         fatbin_file = patch_path + "gpu_memory_access_count.fatbin";
+    }
+
+    if (sanitizer_options.enable_touch_tracking) {
+        fatbin_file = patch_path + "gpu_kernel_touch.fatbin";
     }
 
     // Instrument user code!
@@ -81,7 +85,7 @@ void ModuleLoaded(CUmodule module, CUcontext context)
     if (!dMemAccessBuffer && sanitizer_options.enable_access_tracking) {
         sanitizerAlloc(context, (void**)&dMemAccessBuffer, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE);
     }
-    if (!dMemAccessState && !sanitizer_options.enable_access_tracking) {
+    if (!dMemAccessState && sanitizer_options.enable_touch_tracking) {
         sanitizerAlloc(context, (void**)&dMemAccessState, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
     }
 
@@ -91,7 +95,7 @@ void ModuleLoaded(CUmodule module, CUcontext context)
     if (!hMemAccessBuffer && sanitizer_options.enable_access_tracking) {
         sanitizerAllocHost(context, (void**)&hMemAccessBuffer, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE);
     }
-    if (!hMemAccessState && !sanitizer_options.enable_access_tracking) {
+    if (!hMemAccessState && sanitizer_options.enable_touch_tracking) {
         sanitizerAllocHost(context, (void**)&hMemAccessState, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
     }
 }
@@ -111,7 +115,9 @@ void LaunchBegin(
 
     if (sanitizer_options.enable_access_tracking) {
         sanitizerMemset(dMemAccessBuffer, 0, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, hstream);
-    } else {
+    }
+    
+    if (sanitizer_options.enable_touch_tracking) {
         memset(hMemAccessState, 0, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
         for (const auto& range : activeAllocations)
         {
@@ -144,21 +150,30 @@ void LaunchEnd(
     std::string functionName,
     Sanitizer_StreamHandle hstream)
 {
-    // while (true)
-    // {
-    //     sanitizerMemcpyDeviceToHost(hMemAccessTracker, dMemAccessTracker, sizeof(*dMemAccessTracker), hstream);
-    //     if (hMemAccessTracker->numThreads == 0) {
-    //         break;
-    //     }
-    // }
+
+    if (sanitizer_options.enable_access_tracking) {
+        while (true)
+        {
+            sanitizerMemcpyDeviceToHost(hMemAccessTracker, dMemAccessTracker, sizeof(*dMemAccessTracker), hstream);
+            if (hMemAccessTracker->numThreads == 0) {
+                break;
+            }
+        }
+    }
+    
 
     sanitizerStreamSynchronize(hstream);
     sanitizerMemcpyDeviceToHost(hMemAccessTracker, dMemAccessTracker, sizeof(*dMemAccessTracker), hstream);
 
+    if (sanitizer_options.enable_access_tracking) {
+        auto numEntries = std::min(hMemAccessTracker->currentEntry, hMemAccessTracker->maxEntry);
+        sanitizerMemcpyDeviceToHost(hMemAccessBuffer, hMemAccessTracker->accesses, sizeof(MemoryAccess) * numEntries, hstream);
+        yosemite_gpu_data_analysis(hMemAccessBuffer, numEntries);
 
-    std::cout << "Kernel " << functionName << " has " << hMemAccessTracker->accessCount << " memory accesses." << std::endl;
+    } else {
+        yosemite_gpu_data_analysis(hMemAccessTracker, hMemAccessTracker->accessCount);
+    }
 
-    yosemite_gpu_data_analysis(hMemAccessTracker, hMemAccessTracker->accessCount);
     yosemite_kernel_end_callback(functionName);
 }
 
