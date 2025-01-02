@@ -239,6 +239,32 @@ void ComputeSanitizerCallback(
                     break;
             }
             break;
+        case SANITIZER_CB_DOMAIN_MEMCPY:
+            switch (cbid)
+            {
+                case SANITIZER_CBID_MEMCPY_STARTING:
+                {
+                    auto* pMemcpyData = (Sanitizer_MemcpyData*)cbdata;
+                    yosemite_memcpy_callback(pMemcpyData->dstAddress, pMemcpyData->srcAddress, pMemcpyData->size, pMemcpyData->isAsync, (uint32_t)pMemcpyData->direction);
+                    break;
+                }
+                default:
+                    break;
+            }
+            break;
+        case SANITIZER_CB_DOMAIN_MEMSET:
+            switch (cbid)
+            {
+                case SANITIZER_CBID_MEMSET_STARTING:
+                {
+                    auto* pMemsetData = (Sanitizer_MemsetData*)cbdata;
+                    yosemite_memset_callback(pMemsetData->address, pMemsetData->elementSize, pMemsetData->value, pMemsetData->isAsync);
+                    break;
+                }
+                default:
+                    break;
+            }
+            break;
         default:
             break;
     }
@@ -256,6 +282,8 @@ int InitializeInjection()
     sanitizerSubscribe(&handle, ComputeSanitizerCallback, nullptr);
     sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_RESOURCE);
     sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_LAUNCH);
+    sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_MEMCPY);
+    sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_MEMSET);
 
     yosemite_init(sanitizer_options);
 
