@@ -17,8 +17,13 @@ cd $CU_PROF_HOME/sanalyzer/cxx_backtrace
 ./build_libbacktrace
 make install BACKTRACE_DIR=$CU_PROF_HOME/sanalyzer/cxx_backtrace/libbacktrace/backtrace -j
 
+cd $CU_PROF_HOME/sanalyzer/py_frame
+make install PYBDIN11_DIR=$CU_PROF_HOME/sanalyzer/py_frame/pybind11 -j
+
 cd $CU_PROF_HOME/sanalyzer
-make install SANITIZER_TOOL_DIR=$CU_PROF_HOME CXX_BACKTRACE_DIR=$CU_PROF_HOME/sanalyzer/cxx_backtrace/cxx_backtrace -j
+make install SANITIZER_TOOL_DIR=$CU_PROF_HOME \
+             CXX_BACKTRACE_DIR=$CU_PROF_HOME/sanalyzer/cxx_backtrace/cxx_backtrace \
+             PY_FRAME_DIR=$CU_PROF_HOME/sanalyzer/py_frame/py_frame -j
 
 cd $CU_PROF_HOME
 make SANALYZER_DIR=$CU_PROF_HOME/sanalyzer -j

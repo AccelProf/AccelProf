@@ -1,0 +1,29 @@
+#!/bin/bash
+
+if [ -z "${CU_PROF_HOME}" ]; then
+    echo "Please set the environment variable CU_PROF_HOME to the root directory of the CUDA Profiling Tools."
+    exit 1
+fi
+
+if [ "$(pwd)" != "$CU_PROF_HOME" ]; then
+    echo "Please run this script from the directory where it is located."
+    exit 1
+fi
+
+cd $CU_PROF_HOME
+make clean
+
+cd $CU_PROF_HOME/sanalyzer
+make clean
+
+cd $CU_PROF_HOME/sanalyzer/cxx_backtrace
+make clean
+
+cd $CU_PROF_HOME/sanalyzer/cxx_backtrace/libbacktrace
+rm -rf backtrace
+rm -rf build
+
+cd $CU_PROF_HOME/sanalyzer/py_frame
+make clean
+
+
