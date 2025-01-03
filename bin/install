@@ -13,10 +13,12 @@ fi
 cd $CU_PROF_HOME
 git submodule update --init --recursive
 
-cd $CU_PROF_HOME/sanalyzer
-make install SANITIZER_TOOL_DIR=$CU_PROF_HOME -j
+cd $CU_PROF_HOME/sanalyzer/cxx_backtrace
+./build_libbacktrace
+make install BACKTRACE_DIR=$CU_PROF_HOME/sanalyzer/cxx_backtrace/libbacktrace/backtrace -j
 
+cd $CU_PROF_HOME/sanalyzer
+make install SANITIZER_TOOL_DIR=$CU_PROF_HOME CXX_BACKTRACE_DIR=$CU_PROF_HOME/sanalyzer/cxx_backtrace/cxx_backtrace -j
 
 cd $CU_PROF_HOME
 make SANALYZER_DIR=$CU_PROF_HOME/sanalyzer -j
-
