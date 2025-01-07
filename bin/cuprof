@@ -108,7 +108,8 @@ then
 else
     error_hint "Invalid tool name."
 fi
-echo "Conduct tool ${YOSEMITE_TOOL_NAME} for ${APP_NAME}..."
+echo "Conduct ${YOSEMITE_TOOL_NAME} tool for ${APP_NAME}..."
 
-
-LD_PRELOAD=${CU_PROF_HOME}/lib/libcompute_sanitizer.so ${EXECUTABLE} ${ARGS} &> ${OUTPUT_REDIRECT}
+echo "LD_PRELOAD=${CU_PROF_HOME}/lib/libcompute_sanitizer.so" > ${OUTPUT_REDIRECT}
+echo "${EXECUTABLE} ${ARGS}" >> ${OUTPUT_REDIRECT}
+LD_PRELOAD=${CU_PROF_HOME}/lib/libcompute_sanitizer.so ${EXECUTABLE} ${ARGS} &>> ${OUTPUT_REDIRECT}

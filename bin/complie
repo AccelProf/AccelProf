@@ -14,6 +14,9 @@ cd $CU_PROF_HOME
 # git submodule update --init --recursive
 
 cd $CU_PROF_HOME/sanalyzer/cxx_backtrace
+if [ ! -d "$CU_PROF_HOME/sanalyzer/cxx_backtrace/libbacktrace/backtrace" ]; then
+    ./build_libbacktrace
+fi
 # ./build_libbacktrace
 make install BACKTRACE_DIR=$CU_PROF_HOME/sanalyzer/cxx_backtrace/libbacktrace/backtrace -j
 
