@@ -47,6 +47,11 @@ INCLUDE_FLAGS  += -I$(SANALYZER_DIR)/include
 LINK_FLAGS     += -L$(SANALYZER_DIR)/lib -Wl,-rpath=$(SANALYZER_DIR)/lib
 LINK_LIBS	   += -lsanalyzer
 
+# TENSOR_SCOPE_DIR := tensor_scope/tensor_scope/
+INCLUDE_FLAGS  += -I$(TENSOR_SCOPE_DIR)/include
+LINK_FLAGS     += -L$(TENSOR_SCOPE_DIR)/lib -Wl,-rpath=$(TENSOR_SCOPE_DIR)/lib
+LINK_LIBS	   += -ltensor_scope
+
 ################################################################################
 
 # Target rules

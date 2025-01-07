@@ -80,10 +80,10 @@ fi
 if [ ${EXECUTABLE} == "python" ] || [ ${EXECUTABLE} == "python3" ];
 then
     export APP_NAME=$(basename $(echo $ARGS | cut -d' ' -f1) .py)
-    export YOSEMITE_TORCH_PROFILE=1
+    export TORCH_PROFILE_ENABLED=1
 else
     export APP_NAME=${EXECUTABLE#./}
-    export YOSEMITE_TORCH_PROFILE=0
+    export TORCH_PROFILE_ENABLED=0
 fi
 
 if [ ! -z ${VERBOSE} ]

@@ -13,6 +13,7 @@
 #include <cassert>
 
 #include "sanalyzer.h"
+#include "tensor_scope.h"
 
 
 static MemoryAccessTracker* hMemAccessTracker = nullptr;
@@ -44,6 +45,16 @@ static std::string GetMemoryTypeString(MemoryAccessType type)
     if (type == MemoryAccessType::Local) {return "local";}
     else if (type == MemoryAccessType::Shared) {return "shared";}
     else {return "global";}
+}
+
+
+static void tensor_malloc_callback(uint64_t ptr, int64_t size, int64_t allocated, int64_t reserved) {
+    yosemite_tensor_malloc_callback(ptr, size, allocated, reserved);
+}
+
+
+static void tensor_free_callback(uint64_t ptr, int64_t size, int64_t allocated, int64_t reserved) {
+    yosemite_tensor_free_callback(ptr, size, allocated, reserved);
 }
 
 
@@ -286,6 +297,13 @@ int InitializeInjection()
     sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_MEMSET);
 
     yosemite_init(sanitizer_options);
+    // enable torch profiler?
+    const char* torch_prof = std::getenv("TORCH_PROFILE_ENABLED");
+    if (torch_prof && std::string(torch_prof) == "1") {
+        tensor_scope_enable();
+        register_tensor_scope(tensor_malloc_callback, tensor_free_callback);
+        yosemite_torch_prof_enable();
+    }
 
     return 0;
 }

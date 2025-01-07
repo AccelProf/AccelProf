@@ -16,6 +16,9 @@ make clean
 cd $CU_PROF_HOME/sanalyzer
 make clean
 
+cd $CU_PROF_HOME/tensor_scope
+make clean
+
 cd $CU_PROF_HOME/sanalyzer/cxx_backtrace
 make clean
 
