@@ -11,7 +11,6 @@ struct gpu_address_comparator {
     }
 };
 
-
 static __device__
 SanitizerPatchResult CommonCallback(
     void* userdata,
@@ -27,18 +26,25 @@ SanitizerPatchResult CommonCallback(
     uint32_t laneid = get_laneid();
     uint32_t first_laneid = __ffs(active_mask) - 1;
 
-    uint32_t keep = 1;
-    if (pTracker->state != nullptr) {
-        MemoryAccessState* state = (MemoryAccessState*) pTracker->state;
-        MemoryRange* start_end = state->start_end;
-        MemoryRange range = {(uint64_t) ptr, 0};
-        uint32_t pos = map_prev(start_end, range, state->size, gpu_address_comparator());
+    // check the number of accesses
+    int active_threads = __popc(active_mask);
+    if (laneid == first_laneid) {
+        atomicAdd((unsigned long long int*)&pTracker->accessCount, (unsigned long long int) active_threads);
+    }
 
-        if (pos != state->size) {
+    // check touched memory per kernel
+    uint32_t keep = 1;
+    if (pTracker->states != nullptr) {
+        MemoryAccessState* states = (MemoryAccessState*) pTracker->states;
+        MemoryRange* start_end = states->start_end;
+        MemoryRange range = {(uint64_t) ptr, 0};
+        uint32_t pos = map_prev(start_end, range, states->size, gpu_address_comparator());
+
+        if (pos != states->size) {
             // Find an existing range
-            if (atomic_load(state->touch + pos) == 0) {
+            if (atomic_load(states->touch + pos) == 0) {
                 // Update
-                atomic_store(state->touch + pos, (uint8_t)1);
+                atomic_store(states->touch + pos, (uint8_t)1);
             } else {
                 // Filter out
                 keep = 0;
@@ -46,13 +52,13 @@ SanitizerPatchResult CommonCallback(
         }
     }
     __syncwarp(active_mask);
-
     uint32_t all_keep = 0;
     all_keep = ballot((uint32_t)keep, active_mask);
     if (all_keep == 0) {
         // Fast path
         return SANITIZER_PATCH_SUCCESS;
     }
+
 
     return SANITIZER_PATCH_SUCCESS;
 }

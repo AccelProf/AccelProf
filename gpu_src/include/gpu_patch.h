@@ -45,5 +45,5 @@ struct MemoryAccessTracker
     uint32_t numThreads;
     uint64_t accessCount;
     MemoryAccess* accesses;
-    MemoryAccessState* state;
+    MemoryAccessState* states;
 };

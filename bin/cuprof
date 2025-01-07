@@ -79,16 +79,16 @@ fi
 
 if [ ${EXECUTABLE} == "python" ] || [ ${EXECUTABLE} == "python3" ];
 then
-    export APP_NAME=$(basename $(echo $ARGS | cut -d' ' -f1) .py)
+    export YOSEMITE_APP_NAME=$(basename $(echo $ARGS | cut -d' ' -f1) .py)
     export TORCH_PROFILE_ENABLED=1
 else
-    export APP_NAME=${EXECUTABLE#./}
+    export YOSEMITE_APP_NAME=${EXECUTABLE#./}
     export TORCH_PROFILE_ENABLED=0
 fi
 
 if [ ! -z ${VERBOSE} ]
 then
-    export OUTPUT_REDIRECT=${RESULT_DIR}/${APP_NAME}.cuprof.log
+    export OUTPUT_REDIRECT=${RESULT_DIR}/${YOSEMITE_APP_NAME}.cuprof.log
 else
     export OUTPUT_REDIRECT=/dev/null
 fi
@@ -108,7 +108,7 @@ then
 else
     error_hint "Invalid tool name."
 fi
-echo "Conduct ${YOSEMITE_TOOL_NAME} tool for ${APP_NAME}..."
+echo "Conduct ${YOSEMITE_TOOL_NAME} tool for ${YOSEMITE_APP_NAME}..."
 
 echo "LD_PRELOAD=${CU_PROF_HOME}/lib/libcompute_sanitizer.so" > ${OUTPUT_REDIRECT}
 echo "${EXECUTABLE} ${ARGS}" >> ${OUTPUT_REDIRECT}
