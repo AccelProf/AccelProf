@@ -1,5 +1,5 @@
 #include "gpu_patch.h"
-
+#include "sanitizer_helper.h"
 
 #include <sanitizer.h>
 #include <vector_types.h>
@@ -22,6 +22,7 @@ static MemoryAccess* host_access_buffer = nullptr;
 static MemoryAccess* device_access_buffer = nullptr;
 static MemoryAccessState* host_access_state = nullptr;
 static MemoryAccessState* device_access_state = nullptr;
+static DoorBell_t* global_doorbell;
 
 static SanitizerOptions_t sanitizer_options;
 
@@ -38,10 +39,10 @@ static std::string GetMemoryRWString(uint32_t flags)
 }
 
 
-static std::string GetMemoryTypeString(MemoryAccessType type)
+static std::string GetMemoryTypeString(MemoryType type)
 {
-    if (type == MemoryAccessType::Local) {return "local";}
-    else if (type == MemoryAccessType::Shared) {return "shared";}
+    if (type == MemoryType::Local) {return "local";}
+    else if (type == MemoryType::Shared) {return "shared";}
     else {return "global";}
 }
 
@@ -122,17 +123,22 @@ void LaunchBegin(
             memset(host_access_state, 0, sizeof(MemoryAccessState));
             yosemite_query_active_ranges(host_access_state->start_end, MAX_ACTIVE_ALLOCATIONS, &host_access_state->size);
             sanitizerMemcpyHostToDeviceAsync(device_access_state, host_access_state, sizeof(MemoryAccessState), hstream);
+            host_tracker_handle->accessCount = 0;
+            host_tracker_handle->states = device_access_state;
         } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
             sanitizerMemset(device_access_buffer, 0, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, hstream);
-        }
+            host_tracker_handle->currentEntry = 0;
+            host_tracker_handle->numEntries = 0;
+            host_tracker_handle->accesses = device_access_buffer;
 
-        uint32_t num_threads = blockDims.x * blockDims.y * blockDims.z * gridDims.x * gridDims.y * gridDims.z;
-        host_tracker_handle->currentEntry = 0;
-        host_tracker_handle->maxEntry = MEMORY_ACCESS_BUFFER_SIZE;
-        host_tracker_handle->numThreads = num_threads;
-        host_tracker_handle->accessCount = 0;
-        host_tracker_handle->accesses = device_access_buffer;
-        host_tracker_handle->states = device_access_state;
+            if (!global_doorbell) {
+                sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell_t));
+            }
+            uint32_t num_threads = blockDims.x * blockDims.y * blockDims.z * gridDims.x * gridDims.y * gridDims.z;
+            global_doorbell->num_threads = num_threads;
+            global_doorbell->full = 0;
+            host_tracker_handle->doorbell = global_doorbell;
+        }        
 
         sanitizerMemcpyHostToDeviceAsync(device_tracker_handle, host_tracker_handle, sizeof(MemoryAccessTracker), hstream);
         sanitizerSetCallbackData(function, device_tracker_handle);
@@ -146,7 +152,8 @@ void LaunchEnd(
     CUstream stream,
     CUfunction function,
     std::string functionName,
-    Sanitizer_StreamHandle hstream)
+    Sanitizer_StreamHandle hstream,
+    Sanitizer_StreamHandle phstream)
 {
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
         if (sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
@@ -159,19 +166,21 @@ void LaunchEnd(
         } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
             while (true)
             {
-                sanitizerMemcpyDeviceToHost(host_tracker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream);
-                if (host_tracker_handle->numThreads == 0) {
+                if (global_doorbell->num_threads == 0) {
                     break;
+                }
+
+                if (global_doorbell->full) {
+                    sanitizerMemcpyDeviceToHost(host_access_buffer, device_access_buffer, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, phstream);
+                    yosemite_gpu_data_analysis(host_access_buffer, MEMORY_ACCESS_BUFFER_SIZE);
+                    global_doorbell->full = 0;
                 }
             }
             sanitizerStreamSynchronize(hstream);
             sanitizerMemcpyDeviceToHost(host_tracker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream);
 
-            auto numEntries = std::min(host_tracker_handle->currentEntry, host_tracker_handle->maxEntry);
-            sanitizerMemcpyDeviceToHost(host_access_buffer, host_tracker_handle->accesses, sizeof(MemoryAccess) * numEntries, hstream);
-
-            std::cout << "Memory accesses for kernel " << functionName << std::endl;
-            std::cout << "numEntries: " << numEntries << std::endl;
+            auto numEntries = host_tracker_handle->numEntries;
+            sanitizerMemcpyDeviceToHost(host_access_buffer, device_access_buffer, sizeof(MemoryAccess) * numEntries, hstream);
             yosemite_gpu_data_analysis(host_access_buffer, numEntries);
         }
     } else {
@@ -188,6 +197,8 @@ void ComputeSanitizerCallback(
     Sanitizer_CallbackId cbid,
     const void* cbdata)
 {
+    if (is_cuda_api_internal()) return;
+
     switch (domain)
     {
         case SANITIZER_CB_DOMAIN_RESOURCE:
@@ -236,7 +247,13 @@ void ComputeSanitizerCallback(
                 case SANITIZER_CBID_LAUNCH_END:
                 {
                     auto* pLaunchData = (Sanitizer_LaunchData*)cbdata;
-                    LaunchEnd(pLaunchData->context, pLaunchData->stream, pLaunchData->function, pLaunchData->functionName, pLaunchData->hStream);
+
+                    CUstream p_stream;
+                    Sanitizer_StreamHandle p_stream_handle;
+                    get_priority_stream(pLaunchData->context, &p_stream);
+                    sanitizerGetStreamHandle(pLaunchData->context, p_stream, &p_stream_handle);
+
+                    LaunchEnd(pLaunchData->context, pLaunchData->stream, pLaunchData->function, pLaunchData->functionName, pLaunchData->hStream, p_stream_handle);
                     break;
                 }
                 default:

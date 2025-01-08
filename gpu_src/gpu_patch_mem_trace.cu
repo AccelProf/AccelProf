@@ -3,7 +3,41 @@
 #include <sanitizer_patching.h>
 
 #include "gpu_utils.h"
+#include <cstdio>
 
+static __device__ __inline__
+uint32_t GetBufferIndex(MemoryAccessTracker* pTracker) {
+    uint32_t idx = MEMORY_ACCESS_BUFFER_SIZE;
+
+    while (idx >= MEMORY_ACCESS_BUFFER_SIZE) {
+        idx = atomicAdd(&(pTracker->currentEntry), 1);
+
+        if (idx >= MEMORY_ACCESS_BUFFER_SIZE) {
+            // buffer is full, wait for last writing thread to flush
+            while (*(volatile uint32_t*)&(pTracker->currentEntry) >= MEMORY_ACCESS_BUFFER_SIZE);
+        }
+    }
+
+    return idx;
+}
+
+static __device__ __inline__
+void IncrementNumEntries(MemoryAccessTracker* pTracker) {
+    DoorBell_t* doorbell = pTracker->doorbell;
+    __threadfence();
+    const uint32_t numEntries = atomicAdd((int*)&(pTracker->numEntries), 1);
+
+    if (numEntries == MEMORY_ACCESS_BUFFER_SIZE - 1) {
+        // make sure everything is visible in memory
+        __threadfence_system();
+        doorbell->full = true;
+        while (doorbell->full);
+
+        pTracker->numEntries = 0;
+        __threadfence();
+        pTracker->currentEntry = 0;
+    }
+}
 
 static __device__
 SanitizerPatchResult CommonCallback(
@@ -12,7 +46,7 @@ SanitizerPatchResult CommonCallback(
     void* ptr,
     uint32_t accessSize,
     uint32_t flags,
-    MemoryAccessType type)
+    MemoryType type)
 {
     auto* pTracker = (MemoryAccessTracker*)userdata;
 
@@ -21,32 +55,26 @@ SanitizerPatchResult CommonCallback(
     uint32_t first_laneid = __ffs(active_mask) - 1;
 
     MemoryAccess* accesses = nullptr;
-    bool full = false;
-    if (laneid == first_laneid) {
-        uint32_t old = atomicAdd(&(pTracker->currentEntry), 1);
 
-        // no more space!
-        if (old >= pTracker->maxEntry) {
-            full = true;
-        } else {
-            accesses = &pTracker->accesses[old];
-            accesses->warpId = get_warpid();
-            accesses->type = type;
-            accesses->accessSize = accessSize;
-            accesses->flags = flags;
-        }
+    if (laneid == first_laneid) {
+        uint32_t idx = GetBufferIndex(pTracker);
+        accesses = &pTracker->accesses[idx];
+        accesses->warpId = get_warpid();
+        accesses->type = type;
+        accesses->accessSize = accessSize;
     }
 
     __syncwarp(active_mask);
 
-    full = (bool) shfl(full, first_laneid, active_mask);
-    if (full) {
-        return SANITIZER_PATCH_SUCCESS;
-    }
-
     accesses = (MemoryAccess*) shfl((uint64_t)accesses, first_laneid, active_mask);
     if (accesses) {
         accesses->addresses[laneid] = (uint64_t)(uintptr_t)ptr;
+    }
+
+    __syncwarp(active_mask);
+
+    if (laneid == first_laneid) {
+        IncrementNumEntries(pTracker);
     }
 
     return SANITIZER_PATCH_SUCCESS;
@@ -60,7 +88,7 @@ SanitizerPatchResult MemoryGlobalAccessCallback(
     uint32_t accessSize,
     uint32_t flags)
 {
-    return CommonCallback(userdata, pc, ptr, accessSize, flags, MemoryAccessType::Global);
+    return CommonCallback(userdata, pc, ptr, accessSize, flags, MemoryType::Global);
 }
 
 extern "C" __device__ __noinline__
@@ -71,7 +99,7 @@ SanitizerPatchResult MemorySharedAccessCallback(
     uint32_t accessSize,
     uint32_t flags)
 {
-    return CommonCallback(userdata, pc, ptr, accessSize, flags, MemoryAccessType::Shared);
+    return CommonCallback(userdata, pc, ptr, accessSize, flags, MemoryType::Shared);
 }
 
 extern "C" __device__ __noinline__
@@ -82,7 +110,7 @@ SanitizerPatchResult MemoryLocalAccessCallback(
     uint32_t accessSize,
     uint32_t flags)
 {
-    return CommonCallback(userdata, pc, ptr, accessSize, flags, MemoryAccessType::Local);
+    return CommonCallback(userdata, pc, ptr, accessSize, flags, MemoryType::Local);
 }
 
 extern "C" __device__ __noinline__
@@ -90,16 +118,17 @@ SanitizerPatchResult MemcpyAsyncCallback(void* userdata, uint64_t pc, void* src,
 {
     if (src)
     {
-        CommonCallback(userdata, pc, src, accessSize, SANITIZER_MEMORY_DEVICE_FLAG_READ, MemoryAccessType::Global);
+        CommonCallback(userdata, pc, src, accessSize, SANITIZER_MEMORY_DEVICE_FLAG_READ, MemoryType::Global);
     }
 
-    return CommonCallback(userdata, pc, (void*)dst, accessSize, SANITIZER_MEMORY_DEVICE_FLAG_WRITE, MemoryAccessType::Shared);
+    return CommonCallback(userdata, pc, (void*)dst, accessSize, SANITIZER_MEMORY_DEVICE_FLAG_WRITE, MemoryType::Shared);
 }
 
 extern "C" __device__ __noinline__
 SanitizerPatchResult BlockExitCallback(void* userdata, uint64_t pc)
 {
     MemoryAccessTracker* tracker = (MemoryAccessTracker*)userdata;
+    DoorBell_t* doorbell = tracker->doorbell;
 
     uint32_t active_mask = __activemask();
     uint32_t laneid = get_laneid();
@@ -107,7 +136,7 @@ SanitizerPatchResult BlockExitCallback(void* userdata, uint64_t pc)
     int32_t pop_count = __popc(active_mask);
 
     if (laneid == first_laneid) {
-        atomicAdd(&tracker->numThreads, -pop_count);
+        atomicAdd((int*)&doorbell->num_threads, -pop_count);
     }
     __syncwarp(active_mask);
 

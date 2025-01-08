@@ -2,12 +2,13 @@
 
 #include <cstdint>
 
+constexpr uint32_t GPU_WARP_SIZE = 32;
 
-#define MAX_ACTIVE_ALLOCATIONS 2048
-#define MEMORY_ACCESS_BUFFER_SIZE 128
-#define GPU_WARP_SIZE 32
+constexpr uint32_t MAX_ACTIVE_ALLOCATIONS = 2048;
+constexpr uint32_t MEMORY_ACCESS_BUFFER_SIZE = 16;
 
-enum class MemoryAccessType
+
+enum class MemoryType
 {
     Global,
     Shared,
@@ -21,7 +22,7 @@ struct MemoryAccess
     uint32_t accessSize;
     uint32_t flags;
     uint64_t warpId;
-    MemoryAccessType type;
+    MemoryType type;
 };
 
 
@@ -37,12 +38,17 @@ struct MemoryAccessState{
     uint8_t touch[MAX_ACTIVE_ALLOCATIONS];
 };
 
+typedef struct {
+    volatile bool full;
+    volatile uint32_t num_threads;
+} DoorBell_t;
+
 // Main tracking structure that patches get as userdata
 struct MemoryAccessTracker
 {
+    DoorBell_t* doorbell;
     uint32_t currentEntry;
-    uint32_t maxEntry;
-    uint32_t numThreads;
+    uint32_t numEntries;
     uint64_t accessCount;
     MemoryAccess* accesses;
     MemoryAccessState* states;

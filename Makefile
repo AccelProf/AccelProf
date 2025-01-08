@@ -1,3 +1,5 @@
+PROJECT := compute_sanitizer
+
 CUDA_PATH      ?= /usr/local/cuda
 SANITIZER_PATH ?= $(CUDA_PATH)/compute-sanitizer
 
@@ -36,6 +38,11 @@ HIGHEST_SM     := $(lastword $(sort $(SMS)))
 GENCODE_FLAGS  += -gencode arch=compute_$(HIGHEST_SM),code=compute_$(HIGHEST_SM)
 
 LIB_DIR        := lib
+OBJ_DIR        := $(LIB_DIR)/obj
+SRC_DIR        := src
+
+SRCS := $(notdir $(wildcard $(SRC_DIR)/*.cpp))
+OBJS := $(addprefix $(OBJ_DIR)/, $(patsubst %.cpp, %.o, $(SRCS)))
 
 PATCH_DIR      := $(LIB_DIR)/gpu_patch
 PATCH_SRC_DIR  := gpu_src
@@ -57,15 +64,21 @@ LINK_LIBS	   += -ltensor_scope
 # Target rules
 all: dirs libs
 
-dirs: $(PATCH_DIR)
+dirs: $(PATCH_DIR) $(OBJ_DIR)
 
-libs: $(LIB_DIR)/libcompute_sanitizer.so $(PATCH_FATBINS)
+libs: $(LIB_DIR)/lib$(PROJECT).so $(PATCH_FATBINS)
 
 $(PATCH_DIR):
 	mkdir -p $@
 
-$(LIB_DIR)/libcompute_sanitizer.so: src/compute_sanitizer.cpp
-	$(CXX) $(CXX_FLAGS) $(INCLUDE_FLAGS) $(LINK_FLAGS) -o $@ $< $(LINK_LIBS)
+$(OBJ_DIR):
+	mkdir -p $@
+
+$(LIB_DIR)/lib$(PROJECT).so: $(OBJS)
+	$(CXX) $(LINK_FLAGS) -o $@ $^ $(LINK_LIBS)
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+	$(CXX) $(CXX_FLAGS) $(INCLUDE_FLAGS) -fPIC -o $@ -c $<
 
 $(PATCH_DIR)/%.fatbin:$(PATCH_SRC_DIR)/%.cu
 	$(NVCC) $(NVCC_FLAGS) -I$(PATCH_SRC_DIR)/include $(GENCODE_FLAGS) -o $@ -c $<

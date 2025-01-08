@@ -18,7 +18,7 @@ SanitizerPatchResult CommonCallback(
     void* ptr,
     uint32_t accessSize,
     uint32_t flags,
-    MemoryAccessType type)
+    MemoryType type)
 {
     auto* pTracker = (MemoryAccessTracker*)userdata;
 
@@ -71,7 +71,7 @@ SanitizerPatchResult MemoryGlobalAccessCallback(
     uint32_t accessSize,
     uint32_t flags)
 {
-    return CommonCallback(userdata, pc, ptr, accessSize, flags, MemoryAccessType::Global);
+    return CommonCallback(userdata, pc, ptr, accessSize, flags, MemoryType::Global);
 }
 
 extern "C" __device__ __noinline__
@@ -82,7 +82,7 @@ SanitizerPatchResult MemorySharedAccessCallback(
     uint32_t accessSize,
     uint32_t flags)
 {
-    return CommonCallback(userdata, pc, ptr, accessSize, flags, MemoryAccessType::Shared);
+    return CommonCallback(userdata, pc, ptr, accessSize, flags, MemoryType::Shared);
 }
 
 extern "C" __device__ __noinline__
@@ -93,7 +93,7 @@ SanitizerPatchResult MemoryLocalAccessCallback(
     uint32_t accessSize,
     uint32_t flags)
 {
-    return CommonCallback(userdata, pc, ptr, accessSize, flags, MemoryAccessType::Local);
+    return CommonCallback(userdata, pc, ptr, accessSize, flags, MemoryType::Local);
 }
 
 extern "C" __device__ __noinline__
@@ -101,8 +101,8 @@ SanitizerPatchResult MemcpyAsyncCallback(void* userdata, uint64_t pc, void* src,
 {
     if (src)
     {
-        CommonCallback(userdata, pc, src, accessSize, SANITIZER_MEMORY_DEVICE_FLAG_READ, MemoryAccessType::Global);
+        CommonCallback(userdata, pc, src, accessSize, SANITIZER_MEMORY_DEVICE_FLAG_READ, MemoryType::Global);
     }
 
-    return CommonCallback(userdata, pc, (void*)dst, accessSize, SANITIZER_MEMORY_DEVICE_FLAG_WRITE, MemoryAccessType::Shared);
+    return CommonCallback(userdata, pc, (void*)dst, accessSize, SANITIZER_MEMORY_DEVICE_FLAG_WRITE, MemoryType::Shared);
 }
