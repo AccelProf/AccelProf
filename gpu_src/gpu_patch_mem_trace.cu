@@ -26,24 +26,25 @@ SanitizerPatchResult CommonCallback(
         uint32_t old = atomicAdd(&(pTracker->currentEntry), 1);
 
         // no more space!
-        if (old >= pTracker->maxEntry)
+        if (old >= pTracker->maxEntry) {
             full = true;
-
-        accesses = &pTracker->accesses[old];
-        accesses->warpId = get_warpid();
-        accesses->type = type;
-        accesses->accessSize = accessSize;
-        accesses->flags = flags;
+        } else {
+            accesses = &pTracker->accesses[old];
+            accesses->warpId = get_warpid();
+            accesses->type = type;
+            accesses->accessSize = accessSize;
+            accesses->flags = flags;
+        }
     }
-    
+
     __syncwarp(active_mask);
-    
-    accesses = (MemoryAccess*) shfl((uint64_t)accesses, first_laneid, active_mask);
+
     full = (bool) shfl(full, first_laneid, active_mask);
     if (full) {
         return SANITIZER_PATCH_SUCCESS;
     }
 
+    accesses = (MemoryAccess*) shfl((uint64_t)accesses, first_laneid, active_mask);
     if (accesses) {
         accesses->addresses[laneid] = (uint64_t)(uintptr_t)ptr;
     }

@@ -77,25 +77,25 @@ void ModuleLoaded(CUmodule module, CUcontext context)
         std::cerr << "Failed to load fatbin. Check its path and included SM architecture." << std::endl;
 
     sanitizerPatchInstructions(SANITIZER_INSTRUCTION_GLOBAL_MEMORY_ACCESS, module, "MemoryGlobalAccessCallback");
-    sanitizerPatchInstructions(SANITIZER_INSTRUCTION_SHARED_MEMORY_ACCESS, module, "MemorySharedAccessCallback");
-    sanitizerPatchInstructions(SANITIZER_INSTRUCTION_LOCAL_MEMORY_ACCESS, module, "MemoryLocalAccessCallback");
+    // sanitizerPatchInstructions(SANITIZER_INSTRUCTION_SHARED_MEMORY_ACCESS, module, "MemorySharedAccessCallback");
+    // sanitizerPatchInstructions(SANITIZER_INSTRUCTION_LOCAL_MEMORY_ACCESS, module, "MemoryLocalAccessCallback");
     sanitizerPatchInstructions(SANITIZER_INSTRUCTION_MEMCPY_ASYNC, module, "MemcpyAsyncCallback");
     sanitizerPatchInstructions(SANITIZER_INSTRUCTION_BLOCK_EXIT, module, "BlockExitCallback");
     sanitizerPatchModule(module);
 
     if (!device_tracker_handle) {
-        sanitizerAlloc(context, (void**)&device_tracker_handle, sizeof(*device_tracker_handle));
+        sanitizerAlloc(context, (void**)&device_tracker_handle, sizeof(MemoryAccessTracker));
     }
     if (!host_tacker_handle) {
-        sanitizerAllocHost(context, (void**)&host_tacker_handle, sizeof(*host_tacker_handle));
+        sanitizerAllocHost(context, (void**)&host_tacker_handle, sizeof(MemoryAccessTracker));
     }
 
     if (sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
         if (!device_access_state)
-            sanitizerAlloc(context, (void**)&device_access_state, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
+            sanitizerAlloc(context, (void**)&device_access_state, sizeof(MemoryAccessState));
 
         if (!host_access_state) {
-            sanitizerAllocHost(context, (void**)&host_access_state, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
+            sanitizerAllocHost(context, (void**)&host_access_state, sizeof(MemoryAccessState));
         }
     } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
         if (!device_access_buffer) {
@@ -119,9 +119,9 @@ void LaunchBegin(
     // std::cout << std::endl << "Launch " << functionName << std::endl;
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
         if (sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
-            memset(host_access_state, 0, sizeof(MemoryAccessState) * MAX_ACTIVE_ALLOCATIONS);
+            memset(host_access_state, 0, sizeof(MemoryAccessState));
             yosemite_query_active_ranges(host_access_state->start_end, MAX_ACTIVE_ALLOCATIONS, &host_access_state->size);
-            sanitizerMemcpyHostToDeviceAsync(device_access_state, host_access_state, sizeof(*device_access_state), hstream);
+            sanitizerMemcpyHostToDeviceAsync(device_access_state, host_access_state, sizeof(MemoryAccessState), hstream);
         } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
             sanitizerMemset(device_access_buffer, 0, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, hstream);
         }
@@ -134,7 +134,7 @@ void LaunchBegin(
         host_tacker_handle->accesses = device_access_buffer;
         host_tacker_handle->states = device_access_state;
 
-        sanitizerMemcpyHostToDeviceAsync(device_tracker_handle, host_tacker_handle, sizeof(*device_tracker_handle), hstream);
+        sanitizerMemcpyHostToDeviceAsync(device_tracker_handle, host_tacker_handle, sizeof(MemoryAccessTracker), hstream);
         sanitizerSetCallbackData(function, device_tracker_handle);
     }
     yosemite_kernel_start_callback(functionName);
@@ -151,24 +151,27 @@ void LaunchEnd(
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
         if (sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
             sanitizerStreamSynchronize(hstream);
-            sanitizerMemcpyDeviceToHost(host_tacker_handle, device_tracker_handle, sizeof(*device_tracker_handle), hstream);
-            sanitizerMemcpyDeviceToHost(host_access_state, device_access_state, sizeof(*device_access_state), hstream);
+            sanitizerMemcpyDeviceToHost(host_tacker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream);
+            sanitizerMemcpyDeviceToHost(host_access_state, device_access_state, sizeof(MemoryAccessState), hstream);
             host_tacker_handle->states = host_access_state;
 
             yosemite_gpu_data_analysis(host_tacker_handle, host_tacker_handle->accessCount);
         } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
             while (true)
             {
-                sanitizerMemcpyDeviceToHost(host_tacker_handle, device_tracker_handle, sizeof(*device_tracker_handle), hstream);
+                sanitizerMemcpyDeviceToHost(host_tacker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream);
                 if (host_tacker_handle->numThreads == 0) {
                     break;
                 }
             }
             sanitizerStreamSynchronize(hstream);
-            sanitizerMemcpyDeviceToHost(host_tacker_handle, device_tracker_handle, sizeof(*device_tracker_handle), hstream);
+            sanitizerMemcpyDeviceToHost(host_tacker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream);
 
             auto numEntries = std::min(host_tacker_handle->currentEntry, host_tacker_handle->maxEntry);
             sanitizerMemcpyDeviceToHost(host_access_buffer, host_tacker_handle->accesses, sizeof(MemoryAccess) * numEntries, hstream);
+
+            std::cout << "Memory accesses for kernel " << functionName << std::endl;
+            std::cout << "numEntries: " << numEntries << std::endl;
             yosemite_gpu_data_analysis(host_access_buffer, numEntries);
         }
     } else {
