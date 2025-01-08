@@ -16,7 +16,7 @@
 #include "tensor_scope.h"
 
 
-static MemoryAccessTracker* host_tacker_handle = nullptr;
+static MemoryAccessTracker* host_tracker_handle = nullptr;
 static MemoryAccessTracker* device_tracker_handle = nullptr;
 static MemoryAccess* host_access_buffer = nullptr;
 static MemoryAccess* device_access_buffer = nullptr;
@@ -86,8 +86,8 @@ void ModuleLoaded(CUmodule module, CUcontext context)
     if (!device_tracker_handle) {
         sanitizerAlloc(context, (void**)&device_tracker_handle, sizeof(MemoryAccessTracker));
     }
-    if (!host_tacker_handle) {
-        sanitizerAllocHost(context, (void**)&host_tacker_handle, sizeof(MemoryAccessTracker));
+    if (!host_tracker_handle) {
+        sanitizerAllocHost(context, (void**)&host_tracker_handle, sizeof(MemoryAccessTracker));
     }
 
     if (sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
@@ -127,14 +127,14 @@ void LaunchBegin(
         }
 
         uint32_t num_threads = blockDims.x * blockDims.y * blockDims.z * gridDims.x * gridDims.y * gridDims.z;
-        host_tacker_handle->currentEntry = 0;
-        host_tacker_handle->maxEntry = MEMORY_ACCESS_BUFFER_SIZE;
-        host_tacker_handle->numThreads = num_threads;
-        host_tacker_handle->accessCount = 0;
-        host_tacker_handle->accesses = device_access_buffer;
-        host_tacker_handle->states = device_access_state;
+        host_tracker_handle->currentEntry = 0;
+        host_tracker_handle->maxEntry = MEMORY_ACCESS_BUFFER_SIZE;
+        host_tracker_handle->numThreads = num_threads;
+        host_tracker_handle->accessCount = 0;
+        host_tracker_handle->accesses = device_access_buffer;
+        host_tracker_handle->states = device_access_state;
 
-        sanitizerMemcpyHostToDeviceAsync(device_tracker_handle, host_tacker_handle, sizeof(MemoryAccessTracker), hstream);
+        sanitizerMemcpyHostToDeviceAsync(device_tracker_handle, host_tracker_handle, sizeof(MemoryAccessTracker), hstream);
         sanitizerSetCallbackData(function, device_tracker_handle);
     }
     yosemite_kernel_start_callback(functionName);
@@ -151,24 +151,24 @@ void LaunchEnd(
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
         if (sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
             sanitizerStreamSynchronize(hstream);
-            sanitizerMemcpyDeviceToHost(host_tacker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream);
+            sanitizerMemcpyDeviceToHost(host_tracker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream);
             sanitizerMemcpyDeviceToHost(host_access_state, device_access_state, sizeof(MemoryAccessState), hstream);
-            host_tacker_handle->states = host_access_state;
+            host_tracker_handle->states = host_access_state;
 
-            yosemite_gpu_data_analysis(host_tacker_handle, host_tacker_handle->accessCount);
+            yosemite_gpu_data_analysis(host_tracker_handle, host_tracker_handle->accessCount);
         } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
             while (true)
             {
-                sanitizerMemcpyDeviceToHost(host_tacker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream);
-                if (host_tacker_handle->numThreads == 0) {
+                sanitizerMemcpyDeviceToHost(host_tracker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream);
+                if (host_tracker_handle->numThreads == 0) {
                     break;
                 }
             }
             sanitizerStreamSynchronize(hstream);
-            sanitizerMemcpyDeviceToHost(host_tacker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream);
+            sanitizerMemcpyDeviceToHost(host_tracker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream);
 
-            auto numEntries = std::min(host_tacker_handle->currentEntry, host_tacker_handle->maxEntry);
-            sanitizerMemcpyDeviceToHost(host_access_buffer, host_tacker_handle->accesses, sizeof(MemoryAccess) * numEntries, hstream);
+            auto numEntries = std::min(host_tracker_handle->currentEntry, host_tracker_handle->maxEntry);
+            sanitizerMemcpyDeviceToHost(host_access_buffer, host_tracker_handle->accesses, sizeof(MemoryAccess) * numEntries, hstream);
 
             std::cout << "Memory accesses for kernel " << functionName << std::endl;
             std::cout << "numEntries: " << numEntries << std::endl;
