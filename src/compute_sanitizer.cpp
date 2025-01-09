@@ -157,6 +157,7 @@ void LaunchEndCallback(
 {
     // Skip sanitizer kernel callback (python interface), only works with app_metric for now
     if (sanitizer_options.skip_sanitizer_callback && sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
+        sanitizerStreamSynchronize(hstream);
         return;
     }
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
