@@ -3,6 +3,7 @@
 
 #include <map>
 #include <cstdio>
+#include <cxxabi.h>
 
 static volatile bool cuda_api_internal = false;
 static std::map<CUcontext, CUstream> context_priority_stream_map;
@@ -62,4 +63,17 @@ void get_stream(CUcontext context, CUstream* p_stream) {
 
 bool is_cuda_api_internal() {
     return cuda_api_internal;
+}
+
+
+const char* get_demangled_name(const char* function) {
+    /// demangle function name
+    const char *func_name = function;
+    int status;
+    char *demangled = abi::__cxa_demangle(function, nullptr, nullptr, &status);
+    if (status == 0) {
+        func_name = demangled;
+    }
+
+    return func_name;
 }

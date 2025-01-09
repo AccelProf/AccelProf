@@ -5,7 +5,7 @@
 constexpr uint32_t GPU_WARP_SIZE = 32;
 
 constexpr uint32_t MAX_ACTIVE_ALLOCATIONS = 2048;
-constexpr uint32_t MEMORY_ACCESS_BUFFER_SIZE = 512;
+constexpr uint32_t MEMORY_ACCESS_BUFFER_SIZE = 1048576;
 
 
 enum class MemoryType

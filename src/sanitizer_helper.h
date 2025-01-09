@@ -9,4 +9,6 @@ void get_stream(CUcontext context, CUstream* p_stream);
 
 bool is_cuda_api_internal();
 
+const char* get_demangled_name(const char* function);
+
 #endif // _SANINITIZER_HELPER_H_

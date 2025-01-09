@@ -15,6 +15,15 @@
 #include <cassert>
 
 
+#define SANITIZER_VERBOSE 1
+
+#if SANITIZER_VERBOSE
+#define PRINT(...) do { fprintf(stdout, __VA_ARGS__); fflush(stdout); } while (0)
+#else
+#define PRINT(...)
+#endif
+
+
 static MemoryAccessTracker* host_tracker_handle = nullptr;
 static MemoryAccessTracker* device_tracker_handle = nullptr;
 static MemoryAccess* host_access_buffer = nullptr;
@@ -148,6 +157,7 @@ void LaunchEnd(
                 }
 
                 if (global_doorbell->full) {
+                    PRINT("[SANITIZER INFO] Doorbell full with size %u. Analyzing data...\n", MEMORY_ACCESS_BUFFER_SIZE);
                     sanitizerMemcpyDeviceToHost(host_access_buffer, device_access_buffer,
                                                     sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, phstream);
                     yosemite_gpu_data_analysis(host_access_buffer, MEMORY_ACCESS_BUFFER_SIZE);
@@ -186,6 +196,64 @@ void ComputeSanitizerCallback(
                 {
                     auto* pModuleData = (Sanitizer_ResourceModuleData*)cbdata;
                     ModuleLoaded(pModuleData->module, pModuleData->context);
+                    PRINT("[SANITIZER INFO] Module %p loaded on context %p\n",
+                            &pModuleData->module, &pModuleData->context);
+                    break;
+                }
+                case SANITIZER_CBID_RESOURCE_MODULE_UNLOAD_STARTING:
+                {
+                    auto* pModuleData = (Sanitizer_ResourceModuleData*)cbdata;
+                    PRINT("[SANITIZER INFO] Module %p unload starting on context %p\n",
+                            &pModuleData->module, &pModuleData->context);
+                    break;
+                }
+                case SANITIZER_CBID_RESOURCE_CONTEXT_CREATION_STARTING:
+                {
+                    auto* pContextData = (Sanitizer_ResourceContextData*)cbdata;
+                    PRINT("[SANITIZER INFO] Context %p creation starting on device %p\n",
+                            &pContextData->context, &pContextData->device);
+                    break;
+                }
+                case SANITIZER_CBID_RESOURCE_CONTEXT_CREATION_FINISHED:
+                {
+                    auto* pContextData = (Sanitizer_ResourceContextData*)cbdata;
+                    PRINT("[SANITIZER INFO] Context %p creation finished on device %p\n",
+                            &pContextData->context, &pContextData->device);
+                    break;
+                }
+                case SANITIZER_CBID_RESOURCE_CONTEXT_DESTROY_STARTING:
+                {
+                    auto* pContextData = (Sanitizer_ResourceContextData*)cbdata;
+                    PRINT("[SANITIZER INFO] Context %p destroy starting on device %p\n",
+                            &pContextData->context, &pContextData->device);
+                    break;
+                }
+                case SANITIZER_CBID_RESOURCE_CONTEXT_DESTROY_FINISHED:
+                {
+                    auto* pContextData = (Sanitizer_ResourceContextData*)cbdata;
+                    PRINT("[SANITIZER INFO] Context %p destroy finished on device %p\n",
+                            &pContextData->context, &pContextData->device);
+                    break;
+                }
+                case SANITIZER_CBID_RESOURCE_STREAM_CREATED:
+                {
+                    auto* pStreamData = (Sanitizer_ResourceStreamData*)cbdata;
+                    PRINT("[SANITIZER INFO] Stream %p created on context %p\n",
+                            &pStreamData->stream, &pStreamData->context);
+                    break;
+                }
+                case SANITIZER_CBID_RESOURCE_STREAM_DESTROY_STARTING:
+                {
+                    auto* pStreamData = (Sanitizer_ResourceStreamData*)cbdata;
+                    PRINT("[SANITIZER INFO] Stream %p destroy starting on context %p\n",
+                            &pStreamData->stream, &pStreamData->context);
+                    break;
+                }
+                case SANITIZER_CBID_RESOURCE_STREAM_DESTROY_FINISHED:
+                {
+                    auto* pStreamData = (Sanitizer_ResourceStreamData*)cbdata;
+                    PRINT("[SANITIZER INFO] Stream %p destroy finished on context %p\n",
+                            &pStreamData->stream, &pStreamData->context);
                     break;
                 }
                 case SANITIZER_CBID_RESOURCE_DEVICE_MEMORY_ALLOC:
@@ -193,7 +261,10 @@ void ComputeSanitizerCallback(
                     auto *pModuleData = (Sanitizer_ResourceMemoryData *)cbdata;
                     if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0)
                         break;
+
                     yosemite_alloc_callback(pModuleData->address, pModuleData->size, pModuleData->flags);
+                    PRINT("[SANITIZER INFO] Malloc memory %p with size %lu (flag: %u)\n",
+                            pModuleData->address, pModuleData->size, pModuleData->flags);
                     break;
                 }
                 case SANITIZER_CBID_RESOURCE_DEVICE_MEMORY_FREE:
@@ -201,7 +272,10 @@ void ComputeSanitizerCallback(
                     auto *pModuleData = (Sanitizer_ResourceMemoryData *)cbdata;
                     if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0)
                         break;
+
                     yosemite_free_callback(pModuleData->address);
+                    PRINT("[SANITIZER INFO] Free memory %p with size %lu\n",
+                            pModuleData->address, pModuleData->size);
                     break;
                 }
                 default:
@@ -221,21 +295,28 @@ void ComputeSanitizerCallback(
                     gridDims.x = pLaunchData->gridDim_x;
                     gridDims.y = pLaunchData->gridDim_y;
                     gridDims.z = pLaunchData->gridDim_z;
-                    LaunchBegin(pLaunchData->context, pLaunchData->function, pLaunchData->functionName,
+                    auto func_name = get_demangled_name(pLaunchData->functionName);
+
+                    LaunchBegin(pLaunchData->context, pLaunchData->function, func_name,
                                     pLaunchData->hStream, blockDims, gridDims);
+                    PRINT("[SANITIZER INFO] Launching kernel %s <<<(%u, %u, %u), (%u, %u, %u)>>>\n",
+                            func_name,
+                            pLaunchData->gridDim_x, pLaunchData->gridDim_y, pLaunchData->gridDim_z,
+                            pLaunchData->blockDim_x, pLaunchData->blockDim_y, pLaunchData->blockDim_z);
                     break;
                 }
                 case SANITIZER_CBID_LAUNCH_END:
                 {
                     auto* pLaunchData = (Sanitizer_LaunchData*)cbdata;
-
                     CUstream p_stream;
                     Sanitizer_StreamHandle p_stream_handle;
                     get_priority_stream(pLaunchData->context, &p_stream);
                     sanitizerGetStreamHandle(pLaunchData->context, p_stream, &p_stream_handle);
+                    auto func_name = get_demangled_name(pLaunchData->functionName);
 
                     LaunchEnd(pLaunchData->context, pLaunchData->stream, pLaunchData->function,
-                                    pLaunchData->functionName, pLaunchData->hStream, p_stream_handle);
+                                    func_name, pLaunchData->hStream, p_stream_handle);
+                    PRINT("[SANITIZER INFO] Kernel %s finished\n", func_name);
                     break;
                 }
                 default:
@@ -250,6 +331,9 @@ void ComputeSanitizerCallback(
                     auto* pMemcpyData = (Sanitizer_MemcpyData*)cbdata;
                     yosemite_memcpy_callback(pMemcpyData->dstAddress, pMemcpyData->srcAddress,pMemcpyData->size,
                                                 pMemcpyData->isAsync, (uint32_t)pMemcpyData->direction);
+                    PRINT("[SANITIZER INFO] Memcpy %p -> %p with size %lu, async: %d, direction: %u\n",
+                            pMemcpyData->srcAddress, pMemcpyData->dstAddress, pMemcpyData->size,
+                            pMemcpyData->isAsync, (uint32_t)pMemcpyData->direction);
                     break;
                 }
                 default:
@@ -264,6 +348,28 @@ void ComputeSanitizerCallback(
                     auto* pMemsetData = (Sanitizer_MemsetData*)cbdata;
                     yosemite_memset_callback(pMemsetData->address, pMemsetData->elementSize,
                                                 pMemsetData->value, pMemsetData->isAsync);
+                    PRINT("[SANITIZER INFO] Memset %p with size %u, value %d, async: %d\n",
+                            pMemsetData->address, pMemsetData->elementSize, pMemsetData->value, pMemsetData->isAsync);
+                    break;
+                }
+                default:
+                    break;
+            }
+            break;
+        case SANITIZER_CB_DOMAIN_SYNCHRONIZE:
+            switch (cbid)
+            {
+                case SANITIZER_CBID_SYNCHRONIZE_STREAM_SYNCHRONIZED:
+                {
+                    auto* pSyncData = (Sanitizer_SynchronizeData*)cbdata;
+                    PRINT("[SANITIZER INFO] Synchronize stream %p finished on context %p\n",
+                            &pSyncData->stream, &pSyncData->context);
+                    break;
+                }
+                case SANITIZER_CBID_SYNCHRONIZE_CONTEXT_SYNCHRONIZED:
+                {
+                    auto* pSyncData = (Sanitizer_SynchronizeData*)cbdata;
+                    PRINT("[SANITIZER INFO] Synchronize context %p finished\n", &pSyncData->context);
                     break;
                 }
                 default:
@@ -289,6 +395,7 @@ int InitializeInjection()
     sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_LAUNCH);
     sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_MEMCPY);
     sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_MEMSET);
+    sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_SYNCHRONIZE);
 
     yosemite_init(sanitizer_options);
     // enable torch profiler?
