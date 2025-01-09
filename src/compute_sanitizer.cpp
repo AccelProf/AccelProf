@@ -36,11 +36,13 @@ static SanitizerOptions_t sanitizer_options;
 
 
 static void tensor_malloc_callback(uint64_t ptr, int64_t size, int64_t allocated, int64_t reserved) {
+    PRINT("[SANITIZER INFO] Malloc tensor %p with size %ld, allocated %ld, reserved %ld\n", ptr, size, allocated, reserved);
     yosemite_tensor_malloc_callback(ptr, size, allocated, reserved);
 }
 
 
 static void tensor_free_callback(uint64_t ptr, int64_t size, int64_t allocated, int64_t reserved) {
+    PRINT("[SANITIZER INFO] Free tensor %p with size %ld, allocated %ld, reserved %ld\n", ptr, size, allocated, reserved);
     yosemite_tensor_free_callback(ptr, size, allocated, reserved);
 }
 
@@ -213,9 +215,9 @@ void ComputeSanitizerCallback(
                 case SANITIZER_CBID_RESOURCE_MODULE_LOADED:
                 {
                     auto* pModuleData = (Sanitizer_ResourceModuleData*)cbdata;
-                    ModuleLoadedCallback(pModuleData->module, pModuleData->context);
                     PRINT("[SANITIZER INFO] Module %p loaded on context %p\n",
                             &pModuleData->module, &pModuleData->context);
+                    ModuleLoadedCallback(pModuleData->module, pModuleData->context);
                     break;
                 }
                 case SANITIZER_CBID_RESOURCE_MODULE_UNLOAD_STARTING:
@@ -280,9 +282,9 @@ void ComputeSanitizerCallback(
                     if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0)
                         break;
 
-                    yosemite_alloc_callback(pModuleData->address, pModuleData->size, pModuleData->flags);
                     PRINT("[SANITIZER INFO] Malloc memory %p with size %lu (flag: %u)\n",
                             pModuleData->address, pModuleData->size, pModuleData->flags);
+                    yosemite_alloc_callback(pModuleData->address, pModuleData->size, pModuleData->flags);
                     break;
                 }
                 case SANITIZER_CBID_RESOURCE_DEVICE_MEMORY_FREE:
@@ -291,9 +293,9 @@ void ComputeSanitizerCallback(
                     if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0)
                         break;
 
-                    yosemite_free_callback(pModuleData->address);
                     PRINT("[SANITIZER INFO] Free memory %p with size %lu\n",
                             pModuleData->address, pModuleData->size);
+                    yosemite_free_callback(pModuleData->address);
                     break;
                 }
                 default:
@@ -315,12 +317,12 @@ void ComputeSanitizerCallback(
                     gridDims.z = pLaunchData->gridDim_z;
                     auto func_name = sanitizer_demangled_name_get(pLaunchData->functionName);
 
-                    LaunchBeginCallback(pLaunchData->context, pLaunchData->function, func_name,
-                                    pLaunchData->hStream, blockDims, gridDims);
                     PRINT("[SANITIZER INFO] Launching kernel %s <<<(%u, %u, %u), (%u, %u, %u)>>>\n",
                             func_name,
                             pLaunchData->gridDim_x, pLaunchData->gridDim_y, pLaunchData->gridDim_z,
                             pLaunchData->blockDim_x, pLaunchData->blockDim_y, pLaunchData->blockDim_z);
+                    LaunchBeginCallback(pLaunchData->context, pLaunchData->function, func_name,
+                                    pLaunchData->hStream, blockDims, gridDims);
                     break;
                 }
                 case SANITIZER_CBID_LAUNCH_END:
@@ -347,11 +349,11 @@ void ComputeSanitizerCallback(
                 case SANITIZER_CBID_MEMCPY_STARTING:
                 {
                     auto* pMemcpyData = (Sanitizer_MemcpyData*)cbdata;
-                    yosemite_memcpy_callback(pMemcpyData->dstAddress, pMemcpyData->srcAddress,pMemcpyData->size,
-                                                pMemcpyData->isAsync, (uint32_t)pMemcpyData->direction);
                     PRINT("[SANITIZER INFO] Memcpy %p -> %p with size %lu, async: %d, direction: %u\n",
                             pMemcpyData->srcAddress, pMemcpyData->dstAddress, pMemcpyData->size,
                             pMemcpyData->isAsync, (uint32_t)pMemcpyData->direction);
+                    yosemite_memcpy_callback(pMemcpyData->dstAddress, pMemcpyData->srcAddress,pMemcpyData->size,
+                                                pMemcpyData->isAsync, (uint32_t)pMemcpyData->direction);
                     break;
                 }
                 default:
@@ -364,10 +366,10 @@ void ComputeSanitizerCallback(
                 case SANITIZER_CBID_MEMSET_STARTING:
                 {
                     auto* pMemsetData = (Sanitizer_MemsetData*)cbdata;
-                    yosemite_memset_callback(pMemsetData->address, pMemsetData->elementSize,
-                                                pMemsetData->value, pMemsetData->isAsync);
                     PRINT("[SANITIZER INFO] Memset %p with size %u, value %d, async: %d\n",
                             pMemsetData->address, pMemsetData->elementSize, pMemsetData->value, pMemsetData->isAsync);
+                    yosemite_memset_callback(pMemsetData->address, pMemsetData->elementSize,
+                                                pMemsetData->value, pMemsetData->isAsync);
                     break;
                 }
                 default:
@@ -431,7 +433,6 @@ int InitializeInjection()
     if (torch_prof && std::string(torch_prof) == "1") {
         tensor_scope_enable();
         register_tensor_scope(tensor_malloc_callback, tensor_free_callback);
-        yosemite_torch_prof_enable();
     }
 
     return 0;

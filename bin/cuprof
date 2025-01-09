@@ -17,6 +17,7 @@ Usage:
     -t <tool_name>
         mem_trace: Trace memory access of CUDA kernels.
         app_metric: Collect metrics for CUDA Applications.
+        code_check: Check CUDA code for potential issues.
 EOF
     exit 0
 }
