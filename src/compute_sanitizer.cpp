@@ -187,6 +187,8 @@ void ComputeSanitizerCallback(
 {
     if (is_cuda_api_internal()) return;
 
+    if (!sanitizer_options.compute_sanitizer_enabled) return;
+
     switch (domain)
     {
         case SANITIZER_CB_DOMAIN_RESOURCE:
@@ -379,6 +381,11 @@ void ComputeSanitizerCallback(
         default:
             break;
     }
+}
+
+
+void enable_compute_sanitizer(bool enable) {
+    sanitizer_options.compute_sanitizer_enabled = enable;
 }
 
 
