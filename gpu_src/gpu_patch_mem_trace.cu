@@ -59,9 +59,10 @@ SanitizerPatchResult CommonCallback(
     if (laneid == first_laneid) {
         uint32_t idx = GetBufferIndex(pTracker);
         accesses = &pTracker->accesses[idx];
+        accesses->accessSize = accessSize;
+        accesses->flags = flags;
         accesses->warpId = get_warpid();
         accesses->type = type;
-        accesses->accessSize = accessSize;
     }
 
     __syncwarp(active_mask);
