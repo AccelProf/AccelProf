@@ -60,6 +60,7 @@ struct MemoryAccessState
 struct DoorBell
 {
     volatile bool full;
+    volatile bool skip_patch;
     volatile uint32_t num_threads;
 };
 

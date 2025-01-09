@@ -5,7 +5,9 @@
 #include <cstdio>
 #include <cxxabi.h>
 
+static volatile int debug_wait_flag = 1;
 static volatile bool cuda_api_internal = false;
+
 static std::map<CUcontext, CUstream> context_priority_stream_map;
 static std::map<CUcontext, CUstream> context_stream_map;
 
@@ -41,7 +43,7 @@ void create_stream(CUstream* p_stream) {
 }
 
 
-void get_priority_stream(CUcontext context, CUstream* p_stream) {
+void sanitizer_priority_stream_get(CUcontext context, CUstream* p_stream) {
     if (context_priority_stream_map.find(context) != context_priority_stream_map.end()) {
         *p_stream = context_priority_stream_map[context];
     } else {
@@ -51,7 +53,7 @@ void get_priority_stream(CUcontext context, CUstream* p_stream) {
 }
 
 
-void get_stream(CUcontext context, CUstream* p_stream) {
+void sanitizer_stream_get(CUcontext context, CUstream* p_stream) {
     if (context_stream_map.find(context) != context_stream_map.end()) {
         *p_stream = context_stream_map[context];
     } else {
@@ -61,12 +63,21 @@ void get_stream(CUcontext context, CUstream* p_stream) {
 }
 
 
-bool is_cuda_api_internal() {
+bool sanitizer_cuda_api_internal() {
     return cuda_api_internal;
 }
 
 
-const char* get_demangled_name(const char* function) {
+void sanitizer_debug_wait() {
+    const char* debug = std::getenv("COMPUTE_SANITIZER_DEBUG");
+    if (debug) {
+        while (debug_wait_flag);
+    }
+    unsetenv("COMPUTE_SANITIZER_DEBUG");
+}
+
+
+const char* sanitizer_demangled_name_get(const char* function) {
     /// demangle function name
     const char *func_name = function;
     int status;

@@ -45,7 +45,7 @@ static void tensor_free_callback(uint64_t ptr, int64_t size, int64_t allocated, 
 }
 
 
-void ModuleLoaded(CUmodule module, CUcontext context)
+void ModuleLoadedCallback(CUmodule module, CUcontext context)
 {
     if (sanitizer_options.patch_name == GPU_NO_PATCH) {
         return;
@@ -86,6 +86,9 @@ void ModuleLoaded(CUmodule module, CUcontext context)
         if (!host_access_state) {
             sanitizerAllocHost(context, (void**)&host_access_state, sizeof(MemoryAccessState));
         }
+        if (!global_doorbell) {
+            sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell));
+        }
     } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
         if (!device_access_buffer) {
             sanitizerAlloc(context, (void**)&device_access_buffer, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE);
@@ -93,11 +96,14 @@ void ModuleLoaded(CUmodule module, CUcontext context)
         if (!host_access_buffer) {
             sanitizerAllocHost(context, (void**)&host_access_buffer, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE);
         }
+        if (!global_doorbell) {
+            sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell));
+        }
     }
 }
 
 
-void LaunchBegin(
+void LaunchBeginCallback(
     CUcontext context,
     CUfunction function,
     std::string functionName,
@@ -105,12 +111,22 @@ void LaunchBegin(
     dim3 blockDims,
     dim3 gridDims)
 {
+    // Skip sanitizer kernel callback (python interface), only works with app_metric for now
+    if (sanitizer_options.skip_sanitizer_callback && sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
+        global_doorbell->skip_patch = 1;
+        host_tracker_handle->doorBell = global_doorbell;
+        sanitizerMemcpyHostToDeviceAsync(device_tracker_handle, host_tracker_handle, sizeof(MemoryAccessTracker), hstream);
+        sanitizerSetCallbackData(function, device_tracker_handle);
+        return;
+    }
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
         if (sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
             memset(host_access_state, 0, sizeof(MemoryAccessState));
             yosemite_query_active_ranges(host_access_state->start_end, MAX_ACTIVE_ALLOCATIONS, &host_access_state->size);
             sanitizerMemcpyHostToDeviceAsync(device_access_state, host_access_state, sizeof(MemoryAccessState), hstream);
             host_tracker_handle->accessCount = 0;
+            global_doorbell->skip_patch = 0;
+            host_tracker_handle->doorBell = global_doorbell;
             host_tracker_handle->access_state = device_access_state;
         } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
             sanitizerMemset(device_access_buffer, 0, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, hstream);
@@ -118,9 +134,6 @@ void LaunchBegin(
             host_tracker_handle->numEntries = 0;
             host_tracker_handle->access_buffer = device_access_buffer;
 
-            if (!global_doorbell) {
-                sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell));
-            }
             uint32_t num_threads = blockDims.x * blockDims.y * blockDims.z * gridDims.x * gridDims.y * gridDims.z;
             global_doorbell->num_threads = num_threads;
             global_doorbell->full = 0;
@@ -134,7 +147,7 @@ void LaunchBegin(
 }
 
 
-void LaunchEnd(
+void LaunchEndCallback(
     CUcontext context,
     CUstream stream,
     CUfunction function,
@@ -142,6 +155,10 @@ void LaunchEnd(
     Sanitizer_StreamHandle hstream,
     Sanitizer_StreamHandle phstream)
 {
+    // Skip sanitizer kernel callback (python interface), only works with app_metric for now
+    if (sanitizer_options.skip_sanitizer_callback && sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
+        return;
+    }
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
         if (sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
             sanitizerStreamSynchronize(hstream);
@@ -185,9 +202,7 @@ void ComputeSanitizerCallback(
     Sanitizer_CallbackId cbid,
     const void* cbdata)
 {
-    if (is_cuda_api_internal()) return;
-
-    if (!sanitizer_options.compute_sanitizer_enabled) return;
+    if (sanitizer_cuda_api_internal()) return;
 
     switch (domain)
     {
@@ -197,7 +212,7 @@ void ComputeSanitizerCallback(
                 case SANITIZER_CBID_RESOURCE_MODULE_LOADED:
                 {
                     auto* pModuleData = (Sanitizer_ResourceModuleData*)cbdata;
-                    ModuleLoaded(pModuleData->module, pModuleData->context);
+                    ModuleLoadedCallback(pModuleData->module, pModuleData->context);
                     PRINT("[SANITIZER INFO] Module %p loaded on context %p\n",
                             &pModuleData->module, &pModuleData->context);
                     break;
@@ -297,9 +312,9 @@ void ComputeSanitizerCallback(
                     gridDims.x = pLaunchData->gridDim_x;
                     gridDims.y = pLaunchData->gridDim_y;
                     gridDims.z = pLaunchData->gridDim_z;
-                    auto func_name = get_demangled_name(pLaunchData->functionName);
+                    auto func_name = sanitizer_demangled_name_get(pLaunchData->functionName);
 
-                    LaunchBegin(pLaunchData->context, pLaunchData->function, func_name,
+                    LaunchBeginCallback(pLaunchData->context, pLaunchData->function, func_name,
                                     pLaunchData->hStream, blockDims, gridDims);
                     PRINT("[SANITIZER INFO] Launching kernel %s <<<(%u, %u, %u), (%u, %u, %u)>>>\n",
                             func_name,
@@ -312,11 +327,11 @@ void ComputeSanitizerCallback(
                     auto* pLaunchData = (Sanitizer_LaunchData*)cbdata;
                     CUstream p_stream;
                     Sanitizer_StreamHandle p_stream_handle;
-                    get_priority_stream(pLaunchData->context, &p_stream);
+                    sanitizer_priority_stream_get(pLaunchData->context, &p_stream);
                     sanitizerGetStreamHandle(pLaunchData->context, p_stream, &p_stream_handle);
-                    auto func_name = get_demangled_name(pLaunchData->functionName);
+                    auto func_name = sanitizer_demangled_name_get(pLaunchData->functionName);
 
-                    LaunchEnd(pLaunchData->context, pLaunchData->stream, pLaunchData->function,
+                    LaunchEndCallback(pLaunchData->context, pLaunchData->stream, pLaunchData->function,
                                     func_name, pLaunchData->hStream, p_stream_handle);
                     PRINT("[SANITIZER INFO] Kernel %s finished\n", func_name);
                     break;
@@ -385,7 +400,11 @@ void ComputeSanitizerCallback(
 
 
 void enable_compute_sanitizer(bool enable) {
-    sanitizer_options.compute_sanitizer_enabled = enable;
+    // only works with app_metric for now
+    if (sanitizer_options.patch_name != GPU_PATCH_APP_METRIC) {
+        return ;
+    }
+    sanitizer_options.skip_sanitizer_callback = !enable;
 }
 
 
@@ -396,6 +415,7 @@ void cleanup(void) {
 
 int InitializeInjection()
 {
+    sanitizer_debug_wait();
     Sanitizer_SubscriberHandle handle;
     sanitizerSubscribe(&handle, ComputeSanitizerCallback, nullptr);
     sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_RESOURCE);

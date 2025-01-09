@@ -21,6 +21,10 @@ SanitizerPatchResult CommonCallback(
     MemoryType type)
 {
     auto* pTracker = (MemoryAccessTracker*)userdata;
+    auto* doorBell = pTracker->doorBell;
+    if (doorBell->skip_patch) {
+        return SANITIZER_PATCH_SUCCESS;
+    }
 
     uint32_t active_mask = __activemask();
     uint32_t laneid = get_laneid();

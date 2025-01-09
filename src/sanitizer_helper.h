@@ -3,12 +3,14 @@
 
 #include <cuda.h>
 
-void get_priority_stream(CUcontext context, CUstream* p_stream);
+void sanitizer_priority_stream_get(CUcontext context, CUstream* p_stream);
 
-void get_stream(CUcontext context, CUstream* p_stream);
+void sanitizer_stream_get(CUcontext context, CUstream* p_stream);
 
-bool is_cuda_api_internal();
+bool sanitizer_cuda_api_internal();
 
-const char* get_demangled_name(const char* function);
+void sanitizer_debug_wait();
+
+const char* sanitizer_demangled_name_get(const char* function);
 
 #endif // _SANINITIZER_HELPER_H_

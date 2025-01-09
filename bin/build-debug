@@ -1,0 +1,32 @@
+#!/bin/bash
+
+CU_PROF_DIR=$(pwd)
+if [ ! -f "${CU_PROF_DIR}/bin/build" ]; then
+    echo "Please run this script in the root directory of CUProf"
+    exit 1
+fi
+
+cd $CU_PROF_DIR
+# git submodule update --init --recursive
+
+cd $CU_PROF_DIR/sanalyzer/cxx_backtrace
+if [ ! -d "$CU_PROF_DIR/sanalyzer/cxx_backtrace/libbacktrace/backtrace" ]; then
+    ./build_libbacktrace
+fi
+# ./build_libbacktrace
+make install DEBUG=1 BACKTRACE_DIR=$CU_PROF_DIR/sanalyzer/cxx_backtrace/libbacktrace/backtrace -j
+
+cd $CU_PROF_DIR/sanalyzer/py_frame
+make install DEBUG=1 PYBDIN11_DIR=$CU_PROF_DIR/sanalyzer/py_frame/pybind11 -j
+
+cd $CU_PROF_DIR/sanalyzer
+make install DEBUG=1 SANITIZER_TOOL_DIR=$CU_PROF_DIR \
+             CXX_BACKTRACE_DIR=$CU_PROF_DIR/sanalyzer/cxx_backtrace/cxx_backtrace \
+             PY_FRAME_DIR=$CU_PROF_DIR/sanalyzer/py_frame/py_frame -j
+
+cd $CU_PROF_DIR/tensor_scope
+make install DEBUG=1 -j
+
+cd $CU_PROF_DIR
+make DEBUG=1 SANALYZER_DIR=$CU_PROF_DIR/sanalyzer/sanalyzer \
+     TENSOR_SCOPE_DIR=$CU_PROF_DIR/tensor_scope/tensor_scope -j
