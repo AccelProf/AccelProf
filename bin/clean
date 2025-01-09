@@ -1,32 +1,28 @@
 #!/bin/bash
 
-if [ -z "${CU_PROF_HOME}" ]; then
-    echo "Please set the environment variable CU_PROF_HOME to the root directory of the CUDA Profiling Tools."
+CU_PROF_DIR=$(pwd)
+if [ ! -f "${CU_PROF_DIR}/bin/clean" ]; then
+    echo "Please run this script in the root directory of CUProf"
     exit 1
 fi
 
-if [ "$(pwd)" != "$CU_PROF_HOME" ]; then
-    echo "Please run this script from the directory where it is located."
-    exit 1
-fi
-
-cd $CU_PROF_HOME
+cd $CU_PROF_DIR
 make clean
 
-cd $CU_PROF_HOME/tensor_scope
+cd $CU_PROF_DIR/tensor_scope
 make clean
 
-cd $CU_PROF_HOME/sanalyzer
+cd $CU_PROF_DIR/sanalyzer
 make clean
 
-cd $CU_PROF_HOME/sanalyzer/cxx_backtrace
+cd $CU_PROF_DIR/sanalyzer/cxx_backtrace
 make clean
 
-cd $CU_PROF_HOME/sanalyzer/cxx_backtrace/libbacktrace
+cd $CU_PROF_DIR/sanalyzer/cxx_backtrace/libbacktrace
 rm -rf backtrace
 rm -rf build
 
-cd $CU_PROF_HOME/sanalyzer/py_frame
+cd $CU_PROF_DIR/sanalyzer/py_frame
 make clean
 
 

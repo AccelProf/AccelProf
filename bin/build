@@ -1,16 +1,19 @@
 #!/bin/bash
 
 CU_PROF_DIR=$(pwd)
-if [ ! -f "${CU_PROF_DIR}/bin/install" ]; then
+if [ ! -f "${CU_PROF_DIR}/bin/build" ]; then
     echo "Please run this script in the root directory of CUProf"
     exit 1
 fi
 
 cd $CU_PROF_DIR
-git submodule update --init --recursive
+# git submodule update --init --recursive
 
 cd $CU_PROF_DIR/sanalyzer/cxx_backtrace
-./build_libbacktrace
+if [ ! -d "$CU_PROF_DIR/sanalyzer/cxx_backtrace/libbacktrace/backtrace" ]; then
+    ./build_libbacktrace
+fi
+# ./build_libbacktrace
 make install BACKTRACE_DIR=$CU_PROF_DIR/sanalyzer/cxx_backtrace/libbacktrace/backtrace -j
 
 cd $CU_PROF_DIR/sanalyzer/py_frame
