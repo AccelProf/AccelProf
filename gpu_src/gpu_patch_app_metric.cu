@@ -34,8 +34,8 @@ SanitizerPatchResult CommonCallback(
 
     // check touched memory per kernel
     uint32_t keep = 1;
-    if (pTracker->states != nullptr) {
-        MemoryAccessState* states = (MemoryAccessState*) pTracker->states;
+    if (pTracker->access_state != nullptr) {
+        MemoryAccessState* states = (MemoryAccessState*) pTracker->access_state;
         MemoryRange* start_end = states->start_end;
         MemoryRange range = {(uint64_t) ptr, 0};
         uint32_t pos = map_prev(start_end, range, states->size, gpu_address_comparator());

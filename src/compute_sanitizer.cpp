@@ -1,5 +1,7 @@
 #include "gpu_patch.h"
 #include "sanitizer_helper.h"
+#include "tensor_scope.h"
+#include "sanalyzer.h"
 
 #include <sanitizer.h>
 #include <vector_types.h>
@@ -12,9 +14,6 @@
 #include <cstring>
 #include <cassert>
 
-#include "sanalyzer.h"
-#include "tensor_scope.h"
-
 
 static MemoryAccessTracker* host_tracker_handle = nullptr;
 static MemoryAccessTracker* device_tracker_handle = nullptr;
@@ -22,7 +21,7 @@ static MemoryAccess* host_access_buffer = nullptr;
 static MemoryAccess* device_access_buffer = nullptr;
 static MemoryAccessState* host_access_state = nullptr;
 static MemoryAccessState* device_access_state = nullptr;
-static DoorBell_t* global_doorbell;
+static DoorBell* global_doorbell = nullptr;
 
 static SanitizerOptions_t sanitizer_options;
 
@@ -97,27 +96,26 @@ void LaunchBegin(
     dim3 blockDims,
     dim3 gridDims)
 {
-    // std::cout << std::endl << "Launch " << functionName << std::endl;
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
         if (sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
             memset(host_access_state, 0, sizeof(MemoryAccessState));
             yosemite_query_active_ranges(host_access_state->start_end, MAX_ACTIVE_ALLOCATIONS, &host_access_state->size);
             sanitizerMemcpyHostToDeviceAsync(device_access_state, host_access_state, sizeof(MemoryAccessState), hstream);
             host_tracker_handle->accessCount = 0;
-            host_tracker_handle->states = device_access_state;
+            host_tracker_handle->access_state = device_access_state;
         } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
             sanitizerMemset(device_access_buffer, 0, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, hstream);
             host_tracker_handle->currentEntry = 0;
             host_tracker_handle->numEntries = 0;
-            host_tracker_handle->accesses = device_access_buffer;
+            host_tracker_handle->access_buffer = device_access_buffer;
 
             if (!global_doorbell) {
-                sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell_t));
+                sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell));
             }
             uint32_t num_threads = blockDims.x * blockDims.y * blockDims.z * gridDims.x * gridDims.y * gridDims.z;
             global_doorbell->num_threads = num_threads;
             global_doorbell->full = 0;
-            host_tracker_handle->doorbell = global_doorbell;
+            host_tracker_handle->doorBell = global_doorbell;
         }        
 
         sanitizerMemcpyHostToDeviceAsync(device_tracker_handle, host_tracker_handle, sizeof(MemoryAccessTracker), hstream);
@@ -140,8 +138,7 @@ void LaunchEnd(
             sanitizerStreamSynchronize(hstream);
             sanitizerMemcpyDeviceToHost(host_tracker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream);
             sanitizerMemcpyDeviceToHost(host_access_state, device_access_state, sizeof(MemoryAccessState), hstream);
-            host_tracker_handle->states = host_access_state;
-
+            host_tracker_handle->access_state = host_access_state;
             yosemite_gpu_data_analysis(host_tracker_handle, host_tracker_handle->accessCount);
         } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
             while (true)
@@ -151,7 +148,8 @@ void LaunchEnd(
                 }
 
                 if (global_doorbell->full) {
-                    sanitizerMemcpyDeviceToHost(host_access_buffer, device_access_buffer, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, phstream);
+                    sanitizerMemcpyDeviceToHost(host_access_buffer, device_access_buffer,
+                                                    sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, phstream);
                     yosemite_gpu_data_analysis(host_access_buffer, MEMORY_ACCESS_BUFFER_SIZE);
                     global_doorbell->full = 0;
                 }
@@ -193,14 +191,16 @@ void ComputeSanitizerCallback(
                 case SANITIZER_CBID_RESOURCE_DEVICE_MEMORY_ALLOC:
                 {
                     auto *pModuleData = (Sanitizer_ResourceMemoryData *)cbdata;
-                    if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0) break;
+                    if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0)
+                        break;
                     yosemite_alloc_callback(pModuleData->address, pModuleData->size, pModuleData->flags);
                     break;
                 }
                 case SANITIZER_CBID_RESOURCE_DEVICE_MEMORY_FREE:
                 {
                     auto *pModuleData = (Sanitizer_ResourceMemoryData *)cbdata;
-                    if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0) break;
+                    if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0)
+                        break;
                     yosemite_free_callback(pModuleData->address);
                     break;
                 }
@@ -221,7 +221,8 @@ void ComputeSanitizerCallback(
                     gridDims.x = pLaunchData->gridDim_x;
                     gridDims.y = pLaunchData->gridDim_y;
                     gridDims.z = pLaunchData->gridDim_z;
-                    LaunchBegin(pLaunchData->context, pLaunchData->function, pLaunchData->functionName, pLaunchData->hStream, blockDims, gridDims);
+                    LaunchBegin(pLaunchData->context, pLaunchData->function, pLaunchData->functionName,
+                                    pLaunchData->hStream, blockDims, gridDims);
                     break;
                 }
                 case SANITIZER_CBID_LAUNCH_END:
@@ -233,7 +234,8 @@ void ComputeSanitizerCallback(
                     get_priority_stream(pLaunchData->context, &p_stream);
                     sanitizerGetStreamHandle(pLaunchData->context, p_stream, &p_stream_handle);
 
-                    LaunchEnd(pLaunchData->context, pLaunchData->stream, pLaunchData->function, pLaunchData->functionName, pLaunchData->hStream, p_stream_handle);
+                    LaunchEnd(pLaunchData->context, pLaunchData->stream, pLaunchData->function,
+                                    pLaunchData->functionName, pLaunchData->hStream, p_stream_handle);
                     break;
                 }
                 default:
@@ -246,7 +248,8 @@ void ComputeSanitizerCallback(
                 case SANITIZER_CBID_MEMCPY_STARTING:
                 {
                     auto* pMemcpyData = (Sanitizer_MemcpyData*)cbdata;
-                    yosemite_memcpy_callback(pMemcpyData->dstAddress, pMemcpyData->srcAddress, pMemcpyData->size, pMemcpyData->isAsync, (uint32_t)pMemcpyData->direction);
+                    yosemite_memcpy_callback(pMemcpyData->dstAddress, pMemcpyData->srcAddress,pMemcpyData->size,
+                                                pMemcpyData->isAsync, (uint32_t)pMemcpyData->direction);
                     break;
                 }
                 default:
@@ -259,7 +262,8 @@ void ComputeSanitizerCallback(
                 case SANITIZER_CBID_MEMSET_STARTING:
                 {
                     auto* pMemsetData = (Sanitizer_MemsetData*)cbdata;
-                    yosemite_memset_callback(pMemsetData->address, pMemsetData->elementSize, pMemsetData->value, pMemsetData->isAsync);
+                    yosemite_memset_callback(pMemsetData->address, pMemsetData->elementSize,
+                                                pMemsetData->value, pMemsetData->isAsync);
                     break;
                 }
                 default:

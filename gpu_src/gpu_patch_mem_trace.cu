@@ -23,7 +23,7 @@ uint32_t GetBufferIndex(MemoryAccessTracker* pTracker) {
 
 static __device__ __inline__
 void IncrementNumEntries(MemoryAccessTracker* pTracker) {
-    DoorBell_t* doorbell = pTracker->doorbell;
+    DoorBell* doorbell = pTracker->doorBell;
     __threadfence();
     const uint32_t numEntries = atomicAdd((int*)&(pTracker->numEntries), 1);
 
@@ -58,7 +58,7 @@ SanitizerPatchResult CommonCallback(
 
     if (laneid == first_laneid) {
         uint32_t idx = GetBufferIndex(pTracker);
-        accesses = &pTracker->accesses[idx];
+        accesses = &pTracker->access_buffer[idx];
         accesses->accessSize = accessSize;
         accesses->flags = flags;
         accesses->warpId = get_warpid();
@@ -132,7 +132,7 @@ extern "C" __device__ __noinline__
 SanitizerPatchResult BlockExitCallback(void* userdata, uint64_t pc)
 {
     MemoryAccessTracker* tracker = (MemoryAccessTracker*)userdata;
-    DoorBell_t* doorbell = tracker->doorbell;
+    DoorBell* doorbell = tracker->doorBell;
 
     uint32_t active_mask = __activemask();
     uint32_t laneid = get_laneid();

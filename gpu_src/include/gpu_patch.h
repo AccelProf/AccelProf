@@ -43,30 +43,33 @@ struct MemoryAccess
 };
 
 
-struct MemoryRange{
+struct MemoryRange
+{
     uint64_t start;
     uint64_t end;
 };
 
 
-struct MemoryAccessState{
+struct MemoryAccessState
+{
     uint32_t size;
     MemoryRange start_end[MAX_ACTIVE_ALLOCATIONS];
     uint8_t touch[MAX_ACTIVE_ALLOCATIONS];
 };
 
-typedef struct {
+struct DoorBell
+{
     volatile bool full;
     volatile uint32_t num_threads;
-} DoorBell_t;
+};
 
 // Main tracking structure that patches get as userdata
 struct MemoryAccessTracker
 {
-    DoorBell_t* doorbell;
     uint32_t currentEntry;
     uint32_t numEntries;
     uint64_t accessCount;
-    MemoryAccess* accesses;
-    MemoryAccessState* states;
+    DoorBell* doorBell;
+    MemoryAccess* access_buffer;
+    MemoryAccessState* access_state;
 };
