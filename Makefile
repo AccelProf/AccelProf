@@ -14,9 +14,11 @@ LINK_LIBS      := -lsanitizer-public
 NVCC_FLAGS     := --fatbin --compile-as-tools-patch
 NVCC_FLAGS     += $(INCLUDE_FLAGS)
 
-ifeq ($(DEBUG),1)
-    # NVCC_FLAGS += -g -G
-	CXX_FLAGS  += -g -O0
+ifeq ($(DEBUG), 1)
+#	NVCC_FLAGS += -g -G
+	CFLAGS += -g -O0
+else
+	CFLAGS += -O3
 endif
 
 ################################################################################

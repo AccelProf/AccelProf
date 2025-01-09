@@ -11,20 +11,20 @@ git submodule update --init --recursive
 
 cd $CU_PROF_DIR/sanalyzer/cxx_backtrace
 ./build_libbacktrace
-make install BACKTRACE_DIR=$CU_PROF_DIR/sanalyzer/cxx_backtrace/libbacktrace/backtrace -j
+make -j install BACKTRACE_DIR=$CU_PROF_DIR/sanalyzer/cxx_backtrace/libbacktrace/backtrace
 
 cd $CU_PROF_DIR/sanalyzer/py_frame
-make install PYBDIN11_DIR=$CU_PROF_DIR/sanalyzer/py_frame/pybind11 -j
+make -j install PYBDIN11_DIR=$CU_PROF_DIR/sanalyzer/py_frame/pybind11
 
 cd $CU_PROF_DIR/sanalyzer
-make install SANITIZER_TOOL_DIR=$CU_PROF_DIR \
-             CXX_BACKTRACE_DIR=$CU_PROF_DIR/sanalyzer/cxx_backtrace/cxx_backtrace \
-             PY_FRAME_DIR=$CU_PROF_DIR/sanalyzer/py_frame/py_frame -j
+make -j install SANITIZER_TOOL_DIR=$CU_PROF_DIR \
+                CXX_BACKTRACE_DIR=$CU_PROF_DIR/sanalyzer/cxx_backtrace/cxx_backtrace \
+                PY_FRAME_DIR=$CU_PROF_DIR/sanalyzer/py_frame/py_frame
 
 cd $CU_PROF_DIR/tensor_scope
 make install -j
 
 cd $CU_PROF_DIR
-make SANALYZER_DIR=$CU_PROF_DIR/sanalyzer/sanalyzer \
-     TENSOR_SCOPE_DIR=$CU_PROF_DIR/tensor_scope/tensor_scope -j
+make -j SANALYZER_DIR=$CU_PROF_DIR/sanalyzer/sanalyzer \
+        TENSOR_SCOPE_DIR=$CU_PROF_DIR/tensor_scope/tensor_scope
 
