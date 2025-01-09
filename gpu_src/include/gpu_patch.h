@@ -5,7 +5,7 @@
 constexpr uint32_t GPU_WARP_SIZE = 32;
 
 constexpr uint32_t MAX_ACTIVE_ALLOCATIONS = 2048;
-constexpr uint32_t MEMORY_ACCESS_BUFFER_SIZE = 16;
+constexpr uint32_t MEMORY_ACCESS_BUFFER_SIZE = 512;
 
 
 enum class MemoryType
@@ -23,6 +23,23 @@ struct MemoryAccess
     uint32_t flags;
     uint64_t warpId;
     MemoryType type;
+
+    // copy constructor
+    MemoryAccess(const MemoryAccess& other)
+    {
+        for (int i = 0; i < GPU_WARP_SIZE; i++)
+        {
+            addresses[i] = other.addresses[i];
+        }
+        accessSize = other.accessSize;
+        flags = other.flags;
+        warpId = other.warpId;
+        type = other.type;
+    }
+
+    MemoryAccess() = default;
+
+    ~MemoryAccess() = default;
 };
 
 

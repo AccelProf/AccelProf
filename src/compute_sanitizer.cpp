@@ -27,26 +27,6 @@ static DoorBell_t* global_doorbell;
 static SanitizerOptions_t sanitizer_options;
 
 
-static std::string GetMemoryRWString(uint32_t flags)
-{
-    const bool isWrite = !!(flags & SANITIZER_MEMORY_DEVICE_FLAG_WRITE);
-    const bool isRead = !!(flags & SANITIZER_MEMORY_DEVICE_FLAG_READ);
-
-    if (isWrite && isRead) {return "Atomic";}
-    else if (isRead) {return "Read";}
-    else if (isWrite) {return "Write";}
-    else {return "Unknown";}
-}
-
-
-static std::string GetMemoryTypeString(MemoryType type)
-{
-    if (type == MemoryType::Local) {return "local";}
-    else if (type == MemoryType::Shared) {return "shared";}
-    else {return "global";}
-}
-
-
 static void tensor_malloc_callback(uint64_t ptr, int64_t size, int64_t allocated, int64_t reserved) {
     yosemite_tensor_malloc_callback(ptr, size, allocated, reserved);
 }
@@ -80,7 +60,7 @@ void ModuleLoaded(CUmodule module, CUcontext context)
     sanitizerPatchInstructions(SANITIZER_INSTRUCTION_GLOBAL_MEMORY_ACCESS, module, "MemoryGlobalAccessCallback");
     // sanitizerPatchInstructions(SANITIZER_INSTRUCTION_SHARED_MEMORY_ACCESS, module, "MemorySharedAccessCallback");
     // sanitizerPatchInstructions(SANITIZER_INSTRUCTION_LOCAL_MEMORY_ACCESS, module, "MemoryLocalAccessCallback");
-    sanitizerPatchInstructions(SANITIZER_INSTRUCTION_MEMCPY_ASYNC, module, "MemcpyAsyncCallback");
+    // sanitizerPatchInstructions(SANITIZER_INSTRUCTION_MEMCPY_ASYNC, module, "MemcpyAsyncCallback");
     sanitizerPatchInstructions(SANITIZER_INSTRUCTION_BLOCK_EXIT, module, "BlockExitCallback");
     sanitizerPatchModule(module);
 
