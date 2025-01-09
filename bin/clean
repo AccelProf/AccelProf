@@ -13,10 +13,10 @@ fi
 cd $CU_PROF_HOME
 make clean
 
-cd $CU_PROF_HOME/sanalyzer
+cd $CU_PROF_HOME/tensor_scope
 make clean
 
-cd $CU_PROF_HOME/tensor_scope
+cd $CU_PROF_HOME/sanalyzer
 make clean
 
 cd $CU_PROF_HOME/sanalyzer/cxx_backtrace
