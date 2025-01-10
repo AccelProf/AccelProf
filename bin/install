@@ -17,7 +17,7 @@ cd $CU_PROF_DIR/sanalyzer/cxx_backtrace
 make -j install BACKTRACE_DIR=$CU_PROF_DIR/sanalyzer/cxx_backtrace/libbacktrace/backtrace
 
 cd $CU_PROF_DIR/sanalyzer/py_frame
-make -j install PYBDIN11_DIR=$CU_PROF_DIR/sanalyzer/py_frame/pybind11
+make -j install PYBIND11_DIR=$CU_PROF_DIR/sanalyzer/py_frame/pybind11
 
 cd $CU_PROF_DIR/sanalyzer
 make -j install SANITIZER_TOOL_DIR=$CU_PROF_DIR \
@@ -30,4 +30,3 @@ make install -j
 cd $CU_PROF_DIR
 make -j SANALYZER_DIR=$CU_PROF_DIR/sanalyzer/sanalyzer \
         TENSOR_SCOPE_DIR=$CU_PROF_DIR/tensor_scope/tensor_scope
-

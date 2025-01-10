@@ -24,5 +24,3 @@ rm -rf build
 
 cd $CU_PROF_DIR/sanalyzer/py_frame
 make clean
-
-

@@ -30,7 +30,7 @@ fi
 make -j install DEBUG=$DEBUG BACKTRACE_DIR=$CU_PROF_DIR/sanalyzer/cxx_backtrace/libbacktrace/backtrace
 
 cd $CU_PROF_DIR/sanalyzer/py_frame
-make -j install DEBUG=$DEBUG PYBDIN11_DIR=$CU_PROF_DIR/sanalyzer/py_frame/pybind11
+make -j install DEBUG=$DEBUG PYBIND11_DIR=$CU_PROF_DIR/sanalyzer/py_frame/pybind11
 
 cd $CU_PROF_DIR/sanalyzer
 make -j install DEBUG=$DEBUG SANITIZER_TOOL_DIR=$CU_PROF_DIR \
