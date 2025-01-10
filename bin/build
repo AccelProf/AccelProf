@@ -19,6 +19,9 @@ if [ ! -f "${CU_PROF_DIR}/bin/build" ]; then
     exit 1
 fi
 
+# check build env
+source ${CU_PROF_DIR}/bin/utils/check_build_env.sh
+
 cd $CU_PROF_DIR/sanalyzer/cxx_backtrace
 if [ ! -d "$CU_PROF_DIR/sanalyzer/cxx_backtrace/libbacktrace/backtrace" ]; then
     ./build_libbacktrace

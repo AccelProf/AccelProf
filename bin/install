@@ -6,6 +6,9 @@ if [ ! -f "${CU_PROF_DIR}/bin/install" ]; then
     exit 1
 fi
 
+# check build env
+source ${CU_PROF_DIR}/bin/utils/check_build_env.sh
+
 cd $CU_PROF_DIR
 git submodule update --init --recursive
 
