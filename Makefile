@@ -80,7 +80,7 @@ $(LIB_DIR)/lib$(PROJECT).so: $(OBJS)
 	$(CXX) $(LINK_FLAGS) -o $@ $^ $(LINK_LIBS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
-	$(CXX) $(CXX_FLAGS) $(INCLUDE_FLAGS) -fPIC -o $@ -c $<
+	$(CXX) $(CFLAGS) $(INCLUDE_FLAGS) -fPIC -o $@ -c $<
 
 $(PATCH_DIR)/%.fatbin:$(PATCH_SRC_DIR)/%.cu
 	$(NVCC) $(NVCC_FLAGS) -I$(PATCH_SRC_DIR)/include $(GENCODE_FLAGS) -o $@ -c $<
