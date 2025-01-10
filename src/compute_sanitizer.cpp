@@ -428,9 +428,9 @@ int InitializeInjection()
     sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_SYNCHRONIZE);
 
     yosemite_init(sanitizer_options);
-    // enable torch profiler?
-    const char* torch_prof = std::getenv("TORCH_PROFILE_ENABLED");
-    if (torch_prof && std::string(torch_prof) == "1") {
+
+    // register tensor malloc and free callback
+    if (sanitizer_options.torch_prof_enabled) {
         tensor_scope_enable();
         register_tensor_scope(tensor_malloc_callback, tensor_free_callback);
     }

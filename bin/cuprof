@@ -86,6 +86,7 @@ else
     export YOSEMITE_APP_NAME=${EXECUTABLE#./}
     export TORCH_PROFILE_ENABLED=0
 fi
+echo "${EXECUTABLE} ${ARGS}"
 
 if [ ! -z ${VERBOSE} ]
 then
@@ -93,8 +94,6 @@ then
 else
     export OUTPUT_REDIRECT=/dev/null
 fi
-
-echo "${EXECUTABLE} ${ARGS}"
 
 # Profile the application with the specified tool
 if [ ${TOOL} == "code_check" ]
@@ -109,8 +108,26 @@ then
 else
     error_hint "Invalid tool name."
 fi
-echo "Conduct ${YOSEMITE_TOOL_NAME} tool for ${YOSEMITE_APP_NAME}..."
+echo "Running the ${YOSEMITE_TOOL_NAME} tool for ${YOSEMITE_APP_NAME}..."
 
-echo "LD_PRELOAD=${CU_PROF_HOME}/lib/libcompute_sanitizer.so" > ${OUTPUT_REDIRECT}
-echo "${EXECUTABLE} ${ARGS}" >> ${OUTPUT_REDIRECT}
-LD_PRELOAD=${CU_PROF_HOME}/lib/libcompute_sanitizer.so ${EXECUTABLE} ${ARGS} &>> ${OUTPUT_REDIRECT}
+
+# output the command and execution
+printf "%-25s: %s\n" "[CUPROF INFO] LD_PRELOAD" \
+        "${CU_PROF_HOME}/lib/libcompute_sanitizer.so" > ${OUTPUT_REDIRECT}
+printf "%-25s: %s %s\n" "[CUPROF INFO] COMMAND" \
+        "${EXECUTABLE}" "${ARGS}" >> ${OUTPUT_REDIRECT}
+
+# Record start time in seconds since epoch
+start_time=$(date +%s)
+printf "%-25s: %s\n\n" "[CUPROF INFO] START TIME" "$(date)" >> ${OUTPUT_REDIRECT}
+
+# cuprof
+LD_PRELOAD_LIB=${CU_PROF_HOME}/lib/libcompute_sanitizer.so
+LD_PRELOAD=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} &>> ${OUTPUT_REDIRECT}
+
+# Record end time and calculate elapsed time
+end_time=$(date +%s)
+elapsed=$((end_time - start_time))
+printf "%-25s: %s\n" "[CUPROF INFO] END TIME" "$(date)" >> ${OUTPUT_REDIRECT}
+printf "%-25s: %02d:%02d:%02d\n" "[CUPROF INFO] ELAPSED" \
+        $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60)) >> ${OUTPUT_REDIRECT}
