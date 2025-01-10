@@ -349,9 +349,13 @@ void ComputeSanitizerCallback(
                 case SANITIZER_CBID_MEMCPY_STARTING:
                 {
                     auto* pMemcpyData = (Sanitizer_MemcpyData*)cbdata;
-                    PRINT("[SANITIZER INFO] Memcpy %p -> %p with size %lu, async: %d, direction: %u\n",
+                    auto direction = (pMemcpyData->direction == SANITIZER_MEMCPY_DIRECTION_HOST_TO_HOST) ? "H2H" :
+                                     (pMemcpyData->direction == SANITIZER_MEMCPY_DIRECTION_HOST_TO_DEVICE) ? "H2D" :
+                                     (pMemcpyData->direction == SANITIZER_MEMCPY_DIRECTION_DEVICE_TO_HOST) ? "D2H" :
+                                     (pMemcpyData->direction == SANITIZER_MEMCPY_DIRECTION_DEVICE_TO_DEVICE) ? "D2D" : "UNKNOWN";
+                    PRINT("[SANITIZER INFO] Memcpy %p -> %p with size %lu, async: %d, direction: %s\n",
                             pMemcpyData->srcAddress, pMemcpyData->dstAddress, pMemcpyData->size,
-                            pMemcpyData->isAsync, (uint32_t)pMemcpyData->direction);
+                            pMemcpyData->isAsync, direction);
                     yosemite_memcpy_callback(pMemcpyData->dstAddress, pMemcpyData->srcAddress,pMemcpyData->size,
                                                 pMemcpyData->isAsync, (uint32_t)pMemcpyData->direction);
                     break;
