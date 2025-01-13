@@ -264,6 +264,7 @@ void ComputeSanitizerCallback(
                     auto* pModuleData = (Sanitizer_ResourceModuleData*)cbdata;
                     PRINT("[SANITIZER INFO] Module %p loaded on context %p\n",
                             &pModuleData->module, &pModuleData->context);
+
                     ModuleLoadedCallback(pModuleData->module);
                     break;
                 }
@@ -272,6 +273,7 @@ void ComputeSanitizerCallback(
                     auto* pModuleData = (Sanitizer_ResourceModuleData*)cbdata;
                     PRINT("[SANITIZER INFO] Module %p unload starting on context %p\n",
                             &pModuleData->module, &pModuleData->context);
+
                     ModuleUnloadedCallback(pModuleData->module);
                     break;
                 }
@@ -332,6 +334,7 @@ void ComputeSanitizerCallback(
 
                     PRINT("[SANITIZER INFO] Malloc memory %p with size %lu (flag: %u)\n",
                             pModuleData->address, pModuleData->size, pModuleData->flags);
+
                     yosemite_alloc_callback(pModuleData->address, pModuleData->size, pModuleData->flags);
                     break;
                 }
@@ -343,7 +346,8 @@ void ComputeSanitizerCallback(
 
                     PRINT("[SANITIZER INFO] Free memory %p with size %lu\n",
                             pModuleData->address, pModuleData->size);
-                    yosemite_free_callback(pModuleData->address);
+
+                    yosemite_free_callback(pModuleData->address, pModuleData->size);
                     break;
                 }
                 default:
@@ -369,6 +373,7 @@ void ComputeSanitizerCallback(
                             func_name,
                             pLaunchData->gridDim_x, pLaunchData->gridDim_y, pLaunchData->gridDim_z,
                             pLaunchData->blockDim_x, pLaunchData->blockDim_y, pLaunchData->blockDim_z);
+
                     LaunchBeginCallback(pLaunchData->context, pLaunchData->function, func_name,
                                     pLaunchData->hStream, blockDims, gridDims);
                     break;
@@ -384,6 +389,7 @@ void ComputeSanitizerCallback(
 
                     LaunchEndCallback(pLaunchData->context, pLaunchData->stream, pLaunchData->function,
                                     func_name, pLaunchData->hStream, p_stream_handle);
+
                     PRINT("[SANITIZER INFO] Kernel %s finished\n", func_name);
                     break;
                 }
@@ -404,6 +410,7 @@ void ComputeSanitizerCallback(
                     PRINT("[SANITIZER INFO] Memcpy %p -> %p with size %lu, async: %d, direction: %s\n",
                             pMemcpyData->srcAddress, pMemcpyData->dstAddress, pMemcpyData->size,
                             pMemcpyData->isAsync, direction);
+
                     yosemite_memcpy_callback(pMemcpyData->dstAddress, pMemcpyData->srcAddress,pMemcpyData->size,
                                                 pMemcpyData->isAsync, (uint32_t)pMemcpyData->direction);
                     break;
@@ -419,8 +426,9 @@ void ComputeSanitizerCallback(
                 {
                     auto* pMemsetData = (Sanitizer_MemsetData*)cbdata;
                     PRINT("[SANITIZER INFO] Memset %p with size %u, value %d, async: %d\n",
-                            pMemsetData->address, pMemsetData->elementSize, pMemsetData->value, pMemsetData->isAsync);
-                    yosemite_memset_callback(pMemsetData->address, pMemsetData->elementSize,
+                            pMemsetData->address, pMemsetData->width, pMemsetData->value, pMemsetData->isAsync);
+
+                    yosemite_memset_callback(pMemsetData->address, pMemsetData->width,
                                                 pMemsetData->value, pMemsetData->isAsync);
                     break;
                 }
