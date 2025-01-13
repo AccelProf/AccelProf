@@ -23,6 +23,21 @@
 #define PRINT(...)
 #endif
 
+#define SANITIZER_SAFECALL(fn)                                  \
+{                                                               \
+    SanitizerResult result = fn;                                \
+    if (result != SANITIZER_SUCCESS) {                          \
+        const char *error_string;                               \
+        sanitizerGetResultString(result, &error_string);        \
+        fprintf(                                                \
+            stderr,                                             \
+            "[SANITIZER ERROR] '%s' in '%s:%i' - error: %s.\n", \
+            #fn, __FILE__, __LINE__, error_string);             \
+        fflush(stderr);                                         \
+        exit(EXIT_FAILURE);                                     \
+    }                                                           \
+}
+
 
 static MemoryAccessTracker* host_tracker_handle = nullptr;
 static MemoryAccessTracker* device_tracker_handle = nullptr;
@@ -62,44 +77,49 @@ void ModuleLoadedCallback(CUmodule module, CUcontext context)
 
     // Instrument user code
     std::string fatbin_file = patch_path + sanitizer_options.patch_file;
-    SanitizerResult result;
-    result = sanitizerAddPatchesFromFile(fatbin_file.c_str(), 0);
-    if (result != SANITIZER_SUCCESS)
-        std::cerr << "Failed to load fatbin. Check its path and included SM architecture." << std::endl;
+    SANITIZER_SAFECALL(sanitizerAddPatchesFromFile(fatbin_file.c_str(), 0));
 
-    sanitizerPatchInstructions(SANITIZER_INSTRUCTION_GLOBAL_MEMORY_ACCESS, module, "MemoryGlobalAccessCallback");
-    // sanitizerPatchInstructions(SANITIZER_INSTRUCTION_SHARED_MEMORY_ACCESS, module, "MemorySharedAccessCallback");
-    // sanitizerPatchInstructions(SANITIZER_INSTRUCTION_LOCAL_MEMORY_ACCESS, module, "MemoryLocalAccessCallback");
-    // sanitizerPatchInstructions(SANITIZER_INSTRUCTION_MEMCPY_ASYNC, module, "MemcpyAsyncCallback");
-    sanitizerPatchInstructions(SANITIZER_INSTRUCTION_BLOCK_EXIT, module, "BlockExitCallback");
-    sanitizerPatchModule(module);
+    if (sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
+        SANITIZER_SAFECALL(sanitizerPatchInstructions(SANITIZER_INSTRUCTION_GLOBAL_MEMORY_ACCESS, module, "MemoryGlobalAccessCallback"));
+        // SANITIZER_SAFECALL(sanitizerPatchInstructions(SANITIZER_INSTRUCTION_SHARED_MEMORY_ACCESS, module, "MemorySharedAccessCallback"));
+        // SANITIZER_SAFECALL(sanitizerPatchInstructions(SANITIZER_INSTRUCTION_LOCAL_MEMORY_ACCESS, module, "MemoryLocalAccessCallback"));
+        // SANITIZER_SAFECALL(sanitizerPatchInstructions(SANITIZER_INSTRUCTION_MEMCPY_ASYNC, module, "MemcpyAsyncCallback"));
+    } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
+        SANITIZER_SAFECALL(sanitizerPatchInstructions(SANITIZER_INSTRUCTION_GLOBAL_MEMORY_ACCESS, module, "MemoryGlobalAccessCallback"));
+        // SANITIZER_SAFECALL(sanitizerPatchInstructions(SANITIZER_INSTRUCTION_SHARED_MEMORY_ACCESS, module, "MemorySharedAccessCallback"));
+        // SANITIZER_SAFECALL(sanitizerPatchInstructions(SANITIZER_INSTRUCTION_LOCAL_MEMORY_ACCESS, module, "MemoryLocalAccessCallback"));
+        // SANITIZER_SAFECALL(sanitizerPatchInstructions(SANITIZER_INSTRUCTION_MEMCPY_ASYNC, module, "MemcpyAsyncCallback"));
+        SANITIZER_SAFECALL(sanitizerPatchInstructions(SANITIZER_INSTRUCTION_BLOCK_EXIT, module, "BlockExitCallback"));
+    }
+    
+    SANITIZER_SAFECALL(sanitizerPatchModule(module));
 
     if (!device_tracker_handle) {
-        sanitizerAlloc(context, (void**)&device_tracker_handle, sizeof(MemoryAccessTracker));
+        SANITIZER_SAFECALL(sanitizerAlloc(context, (void**)&device_tracker_handle, sizeof(MemoryAccessTracker)));
     }
     if (!host_tracker_handle) {
-        sanitizerAllocHost(context, (void**)&host_tracker_handle, sizeof(MemoryAccessTracker));
+        SANITIZER_SAFECALL(sanitizerAllocHost(context, (void**)&host_tracker_handle, sizeof(MemoryAccessTracker)));
     }
 
     if (sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
         if (!device_access_state)
-            sanitizerAlloc(context, (void**)&device_access_state, sizeof(MemoryAccessState));
+            SANITIZER_SAFECALL(sanitizerAlloc(context, (void**)&device_access_state, sizeof(MemoryAccessState)));
 
         if (!host_access_state) {
-            sanitizerAllocHost(context, (void**)&host_access_state, sizeof(MemoryAccessState));
+            SANITIZER_SAFECALL(sanitizerAllocHost(context, (void**)&host_access_state, sizeof(MemoryAccessState)));
         }
         if (!global_doorbell) {
-            sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell));
+            SANITIZER_SAFECALL(sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell)));
         }
     } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
         if (!device_access_buffer) {
-            sanitizerAlloc(context, (void**)&device_access_buffer, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE);
+            SANITIZER_SAFECALL(sanitizerAlloc(context, (void**)&device_access_buffer, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE));
         }
         if (!host_access_buffer) {
-            sanitizerAllocHost(context, (void**)&host_access_buffer, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE);
+            SANITIZER_SAFECALL(sanitizerAllocHost(context, (void**)&host_access_buffer, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE));
         }
         if (!global_doorbell) {
-            sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell));
+            SANITIZER_SAFECALL(sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell)));
         }
     }
 }
@@ -117,21 +137,21 @@ void LaunchBeginCallback(
     if (sanitizer_options.skip_sanitizer_callback && sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
         global_doorbell->skip_patch = 1;
         host_tracker_handle->doorBell = global_doorbell;
-        sanitizerMemcpyHostToDeviceAsync(device_tracker_handle, host_tracker_handle, sizeof(MemoryAccessTracker), hstream);
-        sanitizerSetCallbackData(function, device_tracker_handle);
+        SANITIZER_SAFECALL(sanitizerMemcpyHostToDeviceAsync(device_tracker_handle, host_tracker_handle, sizeof(MemoryAccessTracker), hstream));
+        SANITIZER_SAFECALL(sanitizerSetCallbackData(function, device_tracker_handle));
         return;
     }
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
         if (sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
             memset(host_access_state, 0, sizeof(MemoryAccessState));
             yosemite_query_active_ranges(host_access_state->start_end, MAX_ACTIVE_ALLOCATIONS, &host_access_state->size);
-            sanitizerMemcpyHostToDeviceAsync(device_access_state, host_access_state, sizeof(MemoryAccessState), hstream);
+            SANITIZER_SAFECALL(sanitizerMemcpyHostToDeviceAsync(device_access_state, host_access_state, sizeof(MemoryAccessState), hstream));
             host_tracker_handle->accessCount = 0;
             global_doorbell->skip_patch = 0;
             host_tracker_handle->doorBell = global_doorbell;
             host_tracker_handle->access_state = device_access_state;
         } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
-            sanitizerMemset(device_access_buffer, 0, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, hstream);
+            SANITIZER_SAFECALL(sanitizerMemset(device_access_buffer, 0, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, hstream));
             host_tracker_handle->currentEntry = 0;
             host_tracker_handle->numEntries = 0;
             host_tracker_handle->access_buffer = device_access_buffer;
@@ -142,8 +162,8 @@ void LaunchBeginCallback(
             host_tracker_handle->doorBell = global_doorbell;
         }        
 
-        sanitizerMemcpyHostToDeviceAsync(device_tracker_handle, host_tracker_handle, sizeof(MemoryAccessTracker), hstream);
-        sanitizerSetCallbackData(function, device_tracker_handle);
+        SANITIZER_SAFECALL(sanitizerMemcpyHostToDeviceAsync(device_tracker_handle, host_tracker_handle, sizeof(MemoryAccessTracker), hstream));
+        SANITIZER_SAFECALL(sanitizerSetCallbackData(function, device_tracker_handle));
     }
     yosemite_kernel_start_callback(functionName);
 }
@@ -159,14 +179,14 @@ void LaunchEndCallback(
 {
     // Skip sanitizer kernel callback (python interface), only works with app_metric for now
     if (sanitizer_options.skip_sanitizer_callback && sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
-        sanitizerStreamSynchronize(hstream);
+        SANITIZER_SAFECALL(sanitizerStreamSynchronize(hstream));
         return;
     }
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
         if (sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
-            sanitizerStreamSynchronize(hstream);
-            sanitizerMemcpyDeviceToHost(host_tracker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream);
-            sanitizerMemcpyDeviceToHost(host_access_state, device_access_state, sizeof(MemoryAccessState), hstream);
+            SANITIZER_SAFECALL(sanitizerStreamSynchronize(hstream));
+            SANITIZER_SAFECALL(sanitizerMemcpyDeviceToHost(host_tracker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream));
+            SANITIZER_SAFECALL(sanitizerMemcpyDeviceToHost(host_access_state, device_access_state, sizeof(MemoryAccessState), hstream));
             host_tracker_handle->access_state = host_access_state;
             yosemite_gpu_data_analysis(host_tracker_handle, host_tracker_handle->accessCount);
         } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
@@ -178,21 +198,21 @@ void LaunchEndCallback(
 
                 if (global_doorbell->full) {
                     PRINT("[SANITIZER INFO] Doorbell full with size %u. Analyzing data...\n", MEMORY_ACCESS_BUFFER_SIZE);
-                    sanitizerMemcpyDeviceToHost(host_access_buffer, device_access_buffer,
-                                                    sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, phstream);
+                    SANITIZER_SAFECALL(sanitizerMemcpyDeviceToHost(host_access_buffer, device_access_buffer,
+                                                    sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, phstream));
                     yosemite_gpu_data_analysis(host_access_buffer, MEMORY_ACCESS_BUFFER_SIZE);
                     global_doorbell->full = 0;
                 }
             }
-            sanitizerStreamSynchronize(hstream);
-            sanitizerMemcpyDeviceToHost(host_tracker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream);
+            SANITIZER_SAFECALL(sanitizerStreamSynchronize(hstream));
+            SANITIZER_SAFECALL(sanitizerMemcpyDeviceToHost(host_tracker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream));
 
             auto numEntries = host_tracker_handle->numEntries;
-            sanitizerMemcpyDeviceToHost(host_access_buffer, device_access_buffer, sizeof(MemoryAccess) * numEntries, hstream);
+            SANITIZER_SAFECALL(sanitizerMemcpyDeviceToHost(host_access_buffer, device_access_buffer, sizeof(MemoryAccess) * numEntries, hstream));
             yosemite_gpu_data_analysis(host_access_buffer, numEntries);
         }
     } else {
-        sanitizerStreamSynchronize(hstream);
+        SANITIZER_SAFECALL(sanitizerStreamSynchronize(hstream));
     }
 
     yosemite_kernel_end_callback(functionName);
@@ -424,12 +444,12 @@ int InitializeInjection()
 {
     sanitizer_debug_wait();
     Sanitizer_SubscriberHandle handle;
-    sanitizerSubscribe(&handle, ComputeSanitizerCallback, nullptr);
-    sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_RESOURCE);
-    sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_LAUNCH);
-    sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_MEMCPY);
-    sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_MEMSET);
-    sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_SYNCHRONIZE);
+    SANITIZER_SAFECALL(sanitizerSubscribe(&handle, ComputeSanitizerCallback, nullptr));
+    SANITIZER_SAFECALL(sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_RESOURCE));
+    SANITIZER_SAFECALL(sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_LAUNCH));
+    SANITIZER_SAFECALL(sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_MEMCPY));
+    SANITIZER_SAFECALL(sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_MEMSET));
+    SANITIZER_SAFECALL(sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_SYNCHRONIZE));
 
     yosemite_init(sanitizer_options);
 
