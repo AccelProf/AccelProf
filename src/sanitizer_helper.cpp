@@ -11,18 +11,18 @@ static volatile bool cuda_api_internal = false;
 static std::map<CUcontext, CUstream> context_priority_stream_map;
 static std::map<CUcontext, CUstream> context_stream_map;
 
-#define CUDA_SAFECALL(call)                                                 \
-    {                                                                       \
-        call;                                                               \
-        cudaError err = cudaGetLastError();                                 \
-        if (cudaSuccess != err) {                                           \
-            fprintf(                                                        \
-                stderr,                                                     \
-                "Cuda error in function '%s' file '%s' in line %i : %s.\n", \
-                #call, __FILE__, __LINE__, cudaGetErrorString(err));        \
-            fflush(stderr);                                                 \
-            exit(EXIT_FAILURE);                                             \
-        }                                                                   \
+#define CUDA_SAFECALL(call)                                          \
+    {                                                                \
+        call;                                                        \
+        cudaError err = cudaGetLastError();                          \
+        if (cudaSuccess != err) {                                    \
+            fprintf(                                                 \
+                stderr,                                              \
+                "[CUDA ERROR] '%s' in '%s:%i' - error: %s.\n",       \
+                #call, __FILE__, __LINE__, cudaGetErrorString(err)); \
+            fflush(stderr);                                          \
+            exit(EXIT_FAILURE);                                      \
+        }                                                            \
     }
 
 

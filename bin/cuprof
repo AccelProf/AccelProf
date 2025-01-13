@@ -125,6 +125,11 @@ printf "%-25s: %s\n\n" "[CUPROF INFO] START TIME" "$(date)" >> ${OUTPUT_REDIRECT
 LD_PRELOAD_LIB=${CU_PROF_HOME}/lib/libcompute_sanitizer.so
 LD_PRELOAD=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} &>> ${OUTPUT_REDIRECT}
 
+# check if the above execution is successful
+if [ $? -ne 0 ]; then
+    error_hint "error: Fail to run the application with CUProf."
+fi
+
 # Record end time and calculate elapsed time
 end_time=$(date +%s)
 elapsed=$((end_time - start_time))
