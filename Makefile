@@ -16,6 +16,8 @@ LINK_LIBS      ?=
 NVCC_FLAGS     ?=
 NVCC_INCS      ?=
 
+INCLUDES       += -Iinclude
+
 INCLUDES       += -I$(CUDA_PATH)/include
 NVCC_INCS      += -I$(CUDA_PATH)/include
 
