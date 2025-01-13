@@ -127,7 +127,8 @@ LD_PRELOAD=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} &>> ${OUTPUT_REDIRECT}
 
 # check if the above execution is successful
 if [ $? -ne 0 ]; then
-    error_hint "error: Fail to run the application with CUProf."
+    echo "error: Fail to run the application with CUProf. Please check ${OUTPUT_REDIRECT} for more details."
+    echo ""
 fi
 
 # Record end time and calculate elapsed time
