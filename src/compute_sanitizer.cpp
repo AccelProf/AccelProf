@@ -48,7 +48,8 @@ static MemoryAccessState* device_access_state = nullptr;
 static DoorBell* global_doorbell = nullptr;
 
 static SanitizerOptions_t sanitizer_options;
-static std::map<CUmodule, bool> active_modules; // <module, is_patched>
+// <module, is_patched>
+static std::map<CUmodule, bool> active_modules;
 
 
 void TensorMallocCallback(uint64_t ptr, int64_t size, int64_t allocated, int64_t reserved) {
@@ -481,11 +482,6 @@ void enable_compute_sanitizer(bool enable) {
 }
 
 
-void cleanup(void) {
-    yosemite_terminate();
-}
-
-
 int InitializeInjection()
 {
     sanitizer_debug_wait();
@@ -506,6 +502,11 @@ int InitializeInjection()
     }
 
     return 0;
+}
+
+
+void cleanup(void) {
+    yosemite_terminate();
 }
 
 __attribute__((constructor))
