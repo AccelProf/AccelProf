@@ -23,19 +23,19 @@
 #define PRINT(...)
 #endif
 
-#define SANITIZER_SAFECALL(fn)                                  \
-{                                                               \
-    SanitizerResult result = fn;                                \
-    if (result != SANITIZER_SUCCESS) {                          \
-        const char *error_string;                               \
-        sanitizerGetResultString(result, &error_string);        \
-        fprintf(                                                \
-            stderr,                                             \
-            "[SANITIZER ERROR] '%s' in '%s:%i' - error: %s.\n", \
-            #fn, __FILE__, __LINE__, error_string);             \
-        fflush(stderr);                                         \
-        exit(EXIT_FAILURE);                                     \
-    }                                                           \
+#define SANITIZER_SAFECALL(fn)                                      \
+{                                                                   \
+    SanitizerResult result = fn;                                    \
+    if (result != SANITIZER_SUCCESS) {                              \
+        const char *error_string;                                   \
+        sanitizerGetResultString(result, &error_string);            \
+        fprintf(                                                    \
+            stderr,                                                 \
+            "[SANITIZER ERROR] '%s' in '%s:%i' - error(%i): %s.\n", \
+            #fn, __FILE__, __LINE__, result, error_string);         \
+        fflush(stderr);                                             \
+        exit(EXIT_FAILURE);                                         \
+    }                                                               \
 }
 
 
