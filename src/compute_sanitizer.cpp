@@ -1,3 +1,5 @@
+#include "compute_sanitizer.h"
+
 #include "gpu_patch.h"
 #include "sanitizer_helper.h"
 #include "tensor_scope.h"
@@ -49,7 +51,7 @@ static DoorBell* global_doorbell = nullptr;
 
 static SanitizerOptions_t sanitizer_options;
 // <module, is_patched>
-static std::map<CUmodule, bool> active_modules;
+static std::map<CUmodule, bool> sanitizer_active_modules;
 
 
 void TensorMallocCallback(uint64_t ptr, int64_t size, int64_t allocated, int64_t reserved) {
@@ -78,12 +80,12 @@ void ModuleUnloadedCallback(CUmodule module) {
         return;
     }
 
-    auto it = active_modules.find(module);
-    assert(it != active_modules.end());
+    auto it = sanitizer_active_modules.find(module);
+    assert(it != sanitizer_active_modules.end());
     if (it->second) {   // unpatch if module is patched
         SANITIZER_SAFECALL(sanitizerUnpatchModule(module));
     }
-    active_modules.erase(it);
+    sanitizer_active_modules.erase(it);
 }
 
 
@@ -93,7 +95,7 @@ void ModuleLoadedCallback(CUmodule module)
         return;
     }
 
-    active_modules.try_emplace(module, sanitizer_options.sanitizer_callback_enabled);
+    sanitizer_active_modules.try_emplace(module, sanitizer_options.sanitizer_callback_enabled);
     if (!sanitizer_options.sanitizer_callback_enabled) {
         return;
     }
@@ -453,7 +455,7 @@ void ComputeSanitizerCallback(
 
 
 void register_module_patches() {
-    for (auto it = active_modules.begin(); it != active_modules.end(); ++it) {
+    for (auto it = sanitizer_active_modules.begin(); it != sanitizer_active_modules.end(); ++it) {
         if (!it->second) {
             ModuleLoadedCallback(it->first);
             it->second = true;
@@ -462,7 +464,7 @@ void register_module_patches() {
 }
 
 void unregister_module_patches() {
-    for (auto it = active_modules.begin(); it != active_modules.end(); ++it) {
+    for (auto it = sanitizer_active_modules.begin(); it != sanitizer_active_modules.end(); ++it) {
         if (it->second) {
             SANITIZER_SAFECALL(sanitizerUnpatchModule(it->first));
             it->second = false;
