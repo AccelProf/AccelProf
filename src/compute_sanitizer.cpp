@@ -48,25 +48,55 @@ static MemoryAccessState* device_access_state = nullptr;
 static DoorBell* global_doorbell = nullptr;
 
 static SanitizerOptions_t sanitizer_options;
+static std::map<CUmodule, bool> active_modules; // <module, is_patched>
 
 
-static void tensor_malloc_callback(uint64_t ptr, int64_t size, int64_t allocated, int64_t reserved) {
+void TensorMallocCallback(uint64_t ptr, int64_t size, int64_t allocated, int64_t reserved) {
+    if (!sanitizer_options.sanitizer_callback_enabled) {
+        return;
+    }
+
     PRINT("[SANITIZER INFO] Malloc tensor %p with size %ld, allocated %ld, reserved %ld\n", ptr, size, allocated, reserved);
     yosemite_tensor_malloc_callback(ptr, size, allocated, reserved);
 }
 
 
-static void tensor_free_callback(uint64_t ptr, int64_t size, int64_t allocated, int64_t reserved) {
+void TensorFreeCallback(uint64_t ptr, int64_t size, int64_t allocated, int64_t reserved) {
+    if (!sanitizer_options.sanitizer_callback_enabled) {
+        return;
+    }
+
     PRINT("[SANITIZER INFO] Free tensor %p with size %ld, allocated %ld, reserved %ld\n", ptr, size, allocated, reserved);
     yosemite_tensor_free_callback(ptr, size, allocated, reserved);
 }
 
 
-void ModuleLoadedCallback(CUmodule module, CUcontext context)
+
+void ModuleUnloadedCallback(CUmodule module) {
+    if (sanitizer_options.patch_name == GPU_NO_PATCH) {
+        return;
+    }
+
+    auto it = active_modules.find(module);
+    assert(it != active_modules.end());
+    if (it->second) {   // unpatch if module is patched
+        SANITIZER_SAFECALL(sanitizerUnpatchModule(module));
+    }
+    active_modules.erase(it);
+}
+
+
+void ModuleLoadedCallback(CUmodule module)
 {
     if (sanitizer_options.patch_name == GPU_NO_PATCH) {
         return;
     }
+
+    active_modules.try_emplace(module, sanitizer_options.sanitizer_callback_enabled);
+    if (!sanitizer_options.sanitizer_callback_enabled) {
+        return;
+    }
+
     const char* env_name = std::getenv("CU_PROF_HOME");
     std::string patch_path;
     if (env_name) {
@@ -93,7 +123,10 @@ void ModuleLoadedCallback(CUmodule module, CUcontext context)
     }
     
     SANITIZER_SAFECALL(sanitizerPatchModule(module));
+}
 
+
+void buffer_init(CUcontext context) {
     if (!device_tracker_handle) {
         SANITIZER_SAFECALL(sanitizerAlloc(context, (void**)&device_tracker_handle, sizeof(MemoryAccessTracker)));
     }
@@ -107,9 +140,6 @@ void ModuleLoadedCallback(CUmodule module, CUcontext context)
 
         if (!host_access_state) {
             SANITIZER_SAFECALL(sanitizerAllocHost(context, (void**)&host_access_state, sizeof(MemoryAccessState)));
-        }
-        if (!global_doorbell) {
-            SANITIZER_SAFECALL(sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell)));
         }
     } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
         if (!device_access_buffer) {
@@ -133,22 +163,14 @@ void LaunchBeginCallback(
     dim3 blockDims,
     dim3 gridDims)
 {
-    // Skip sanitizer kernel callback (python interface), only works with app_metric for now
-    if (sanitizer_options.skip_sanitizer_callback && sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
-        global_doorbell->skip_patch = 1;
-        host_tracker_handle->doorBell = global_doorbell;
-        SANITIZER_SAFECALL(sanitizerMemcpyHostToDeviceAsync(device_tracker_handle, host_tracker_handle, sizeof(MemoryAccessTracker), hstream));
-        SANITIZER_SAFECALL(sanitizerSetCallbackData(function, device_tracker_handle));
-        return;
-    }
+    buffer_init(context);
+
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
         if (sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
             memset(host_access_state, 0, sizeof(MemoryAccessState));
             yosemite_query_active_ranges(host_access_state->start_end, MAX_ACTIVE_ALLOCATIONS, &host_access_state->size);
             SANITIZER_SAFECALL(sanitizerMemcpyHostToDeviceAsync(device_access_state, host_access_state, sizeof(MemoryAccessState), hstream));
             host_tracker_handle->accessCount = 0;
-            global_doorbell->skip_patch = 0;
-            host_tracker_handle->doorBell = global_doorbell;
             host_tracker_handle->access_state = device_access_state;
         } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
             SANITIZER_SAFECALL(sanitizerMemset(device_access_buffer, 0, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, hstream));
@@ -177,11 +199,6 @@ void LaunchEndCallback(
     Sanitizer_StreamHandle hstream,
     Sanitizer_StreamHandle phstream)
 {
-    // Skip sanitizer kernel callback (python interface), only works with app_metric for now
-    if (sanitizer_options.skip_sanitizer_callback && sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
-        SANITIZER_SAFECALL(sanitizerStreamSynchronize(hstream));
-        return;
-    }
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
         if (sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
             SANITIZER_SAFECALL(sanitizerStreamSynchronize(hstream));
@@ -225,6 +242,13 @@ void ComputeSanitizerCallback(
     Sanitizer_CallbackId cbid,
     const void* cbdata)
 {
+    // Skip sanitizer kernel callback (python interface)
+    if (!sanitizer_options.sanitizer_callback_enabled
+        && !((domain == SANITIZER_CB_DOMAIN_RESOURCE && cbid == SANITIZER_CBID_RESOURCE_MODULE_LOADED) ||
+            (domain == SANITIZER_CB_DOMAIN_RESOURCE && cbid == SANITIZER_CBID_RESOURCE_MODULE_UNLOAD_STARTING))) {
+        return;
+    }
+
     if (sanitizer_cuda_api_internal()) return;
 
     switch (domain)
@@ -237,7 +261,7 @@ void ComputeSanitizerCallback(
                     auto* pModuleData = (Sanitizer_ResourceModuleData*)cbdata;
                     PRINT("[SANITIZER INFO] Module %p loaded on context %p\n",
                             &pModuleData->module, &pModuleData->context);
-                    ModuleLoadedCallback(pModuleData->module, pModuleData->context);
+                    ModuleLoadedCallback(pModuleData->module);
                     break;
                 }
                 case SANITIZER_CBID_RESOURCE_MODULE_UNLOAD_STARTING:
@@ -245,6 +269,7 @@ void ComputeSanitizerCallback(
                     auto* pModuleData = (Sanitizer_ResourceModuleData*)cbdata;
                     PRINT("[SANITIZER INFO] Module %p unload starting on context %p\n",
                             &pModuleData->module, &pModuleData->context);
+                    ModuleUnloadedCallback(pModuleData->module);
                     break;
                 }
                 case SANITIZER_CBID_RESOURCE_CONTEXT_CREATION_STARTING:
@@ -426,12 +451,33 @@ void ComputeSanitizerCallback(
 }
 
 
-void enable_compute_sanitizer(bool enable) {
-    // only works with app_metric for now
-    if (sanitizer_options.patch_name != GPU_PATCH_APP_METRIC) {
-        return ;
+void register_module_patches() {
+    for (auto it = active_modules.begin(); it != active_modules.end(); ++it) {
+        if (!it->second) {
+            ModuleLoadedCallback(it->first);
+            it->second = true;
+        }
     }
-    sanitizer_options.skip_sanitizer_callback = !enable;
+}
+
+void unregister_module_patches() {
+    for (auto it = active_modules.begin(); it != active_modules.end(); ++it) {
+        if (it->second) {
+            SANITIZER_SAFECALL(sanitizerUnpatchModule(it->first));
+            it->second = false;
+        }
+    }
+}
+
+
+void enable_compute_sanitizer(bool enable) {
+    sanitizer_options.sanitizer_callback_enabled = enable;
+
+    if (enable) {
+        register_module_patches();
+    } else {
+        unregister_module_patches();
+    }
 }
 
 
@@ -456,7 +502,7 @@ int InitializeInjection()
     // register tensor malloc and free callback
     if (sanitizer_options.torch_prof_enabled) {
         tensor_scope_enable();
-        register_tensor_scope(tensor_malloc_callback, tensor_free_callback);
+        register_tensor_scope(TensorMallocCallback, TensorFreeCallback);
     }
 
     return 0;
