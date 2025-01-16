@@ -47,6 +47,14 @@ struct MemoryRange
 {
     uint64_t start;
     uint64_t end;
+
+    bool operator<(const MemoryRange& other) const {
+        return start < other.start;
+    }
+
+    bool operator==(const MemoryRange& other) const {
+        return start == other.start && end == other.end;
+    }
 };
 
 
