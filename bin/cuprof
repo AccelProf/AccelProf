@@ -18,6 +18,7 @@ Usage:
         mem_trace: Trace memory access of CUDA kernels.
         app_metric: Collect metrics for CUDA Applications.
         code_check: Check CUDA code for potential issues.
+        hot_analysis: Analyze hot memory regions.
 EOF
     exit 0
 }
@@ -105,6 +106,9 @@ then
 elif [ ${TOOL} == "app_metric" ]
 then
     export YOSEMITE_TOOL_NAME=app_metric
+elif [ ${TOOL} == "hot_analysis" ]
+then
+    export YOSEMITE_TOOL_NAME=hot_analysis
 else
     error_hint "Invalid tool name."
 fi

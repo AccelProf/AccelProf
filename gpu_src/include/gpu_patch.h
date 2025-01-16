@@ -4,7 +4,7 @@
 
 constexpr uint32_t GPU_WARP_SIZE = 32;
 
-constexpr uint32_t MAX_ACTIVE_ALLOCATIONS = 2048;
+constexpr uint32_t MAX_NUM_MEMORY_RANGES = 16384;
 constexpr uint32_t MEMORY_ACCESS_BUFFER_SIZE = 1048576;
 
 
@@ -53,8 +53,8 @@ struct MemoryRange
 struct MemoryAccessState
 {
     uint32_t size;
-    MemoryRange start_end[MAX_ACTIVE_ALLOCATIONS];
-    uint8_t touch[MAX_ACTIVE_ALLOCATIONS];
+    MemoryRange start_end[MAX_NUM_MEMORY_RANGES];
+    int32_t touch[MAX_NUM_MEMORY_RANGES];
 };
 
 struct DoorBell

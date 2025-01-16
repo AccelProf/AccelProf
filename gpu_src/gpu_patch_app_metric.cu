@@ -44,7 +44,7 @@ SanitizerPatchResult CommonCallback(
             // Find an existing range
             if (atomic_load(states->touch + pos) == 0) {
                 // Update
-                atomic_store(states->touch + pos, (uint8_t)1);
+                atomic_store(states->touch + pos, 1);
             } else {
                 // Filter out
                 keep = 0;

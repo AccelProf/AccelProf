@@ -132,6 +132,9 @@ void ModuleLoadedCallback(CUmodule module)
         //     sanitizerPatchInstructions(SANITIZER_INSTRUCTION_MEMCPY_ASYNC, module, "MemcpyAsyncCallback"));
         SANITIZER_SAFECALL(
             sanitizerPatchInstructions(SANITIZER_INSTRUCTION_BLOCK_EXIT, module, "BlockExitCallback"));
+    } else if (sanitizer_options.patch_name == GPU_PATCH_HOT_ANALYSIS) {
+        SANITIZER_SAFECALL(
+            sanitizerPatchInstructions(SANITIZER_INSTRUCTION_GLOBAL_MEMORY_ACCESS, module, "MemoryGlobalAccessCallback"));
     }
     
     SANITIZER_SAFECALL(sanitizerPatchModule(module));
@@ -165,6 +168,13 @@ void buffer_init(CUcontext context) {
         if (!global_doorbell) {
             SANITIZER_SAFECALL(sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell)));
         }
+    } else {
+        if (!device_access_state)
+            SANITIZER_SAFECALL(sanitizerAlloc(context, (void**)&device_access_state, sizeof(MemoryAccessState)));
+
+        if (!host_access_state) {
+            SANITIZER_SAFECALL(sanitizerAllocHost(context, (void**)&host_access_state, sizeof(MemoryAccessState)));
+        }
     }
 }
 
@@ -182,7 +192,7 @@ void LaunchBeginCallback(
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
         if (sanitizer_options.patch_name == GPU_PATCH_APP_METRIC) {
             memset(host_access_state, 0, sizeof(MemoryAccessState));
-            yosemite_query_active_ranges(host_access_state->start_end, MAX_ACTIVE_ALLOCATIONS, &host_access_state->size);
+            yosemite_query_active_ranges(host_access_state->start_end, MAX_NUM_MEMORY_RANGES, &host_access_state->size);
             SANITIZER_SAFECALL(
                 sanitizerMemcpyHostToDeviceAsync(device_access_state, host_access_state, sizeof(MemoryAccessState), hstream));
             host_tracker_handle->accessCount = 0;
@@ -198,7 +208,13 @@ void LaunchBeginCallback(
             global_doorbell->num_threads = num_threads;
             global_doorbell->full = 0;
             host_tracker_handle->doorBell = global_doorbell;
-        }        
+        } else if (sanitizer_options.patch_name == GPU_PATCH_HOT_ANALYSIS) {
+            memset(host_access_state, 0, sizeof(MemoryAccessState));
+            yosemite_query_active_ranges(host_access_state->start_end, MAX_NUM_MEMORY_RANGES, &host_access_state->size);
+            SANITIZER_SAFECALL(
+                sanitizerMemcpyHostToDeviceAsync(device_access_state, host_access_state, sizeof(MemoryAccessState), hstream));
+            host_tracker_handle->access_state = device_access_state;
+        }
 
         SANITIZER_SAFECALL(
             sanitizerMemcpyHostToDeviceAsync(device_tracker_handle, host_tracker_handle, sizeof(MemoryAccessTracker), hstream));
@@ -248,6 +264,12 @@ void LaunchEndCallback(
             SANITIZER_SAFECALL(
                 sanitizerMemcpyDeviceToHost(host_access_buffer, device_access_buffer, sizeof(MemoryAccess) * numEntries, hstream));
             yosemite_gpu_data_analysis(host_access_buffer, numEntries);
+        } else if (sanitizer_options.patch_name == GPU_PATCH_HOT_ANALYSIS) {
+            SANITIZER_SAFECALL(sanitizerStreamSynchronize(hstream));
+            SANITIZER_SAFECALL(
+                sanitizerMemcpyDeviceToHost(host_access_state, device_access_state, sizeof(MemoryAccessState), hstream));
+            host_tracker_handle->access_state = host_access_state;
+            yosemite_gpu_data_analysis(host_access_state, host_access_state->size);
         }
     } else {
         SANITIZER_SAFECALL(sanitizerStreamSynchronize(hstream));
@@ -362,10 +384,10 @@ void ComputeSanitizerCallback(
                     if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0)
                         break;
 
-                    PRINT("[SANITIZER INFO] Free memory %p with size %lu\n",
-                            pModuleData->address, pModuleData->size);
+                    PRINT("[SANITIZER INFO] Free memory %p with size %lu (flag: %u)\n",
+                            pModuleData->address, pModuleData->size, pModuleData->flags);
 
-                    yosemite_free_callback(pModuleData->address, pModuleData->size);
+                    yosemite_free_callback(pModuleData->address, pModuleData->size, pModuleData->flags);
                     break;
                 }
                 default:
