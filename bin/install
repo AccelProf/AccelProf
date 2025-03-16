@@ -29,4 +29,4 @@ make install -j
 
 cd $ACCEL_PROF_DIR
 make -j SANALYZER_DIR=$ACCEL_PROF_DIR/sanalyzer/sanalyzer \
-        TENSOR_SCOPE_DIR=$ACCEL_PROF_DIR/tensor_scope/tensor_scope
+        TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/tensor_scope/torch_scope

@@ -69,9 +69,9 @@ INCLUDES       += -I$(SANALYZER_DIR)/include
 LDFLAGS        += -L$(SANALYZER_DIR)/lib -Wl,-rpath=$(SANALYZER_DIR)/lib
 LINK_LIBS	   += -lsanalyzer
 
-INCLUDES       += -I$(TENSOR_SCOPE_DIR)/include
-LDFLAGS        += -L$(TENSOR_SCOPE_DIR)/lib -Wl,-rpath=$(TENSOR_SCOPE_DIR)/lib
-LINK_LIBS	   += -ltensor_scope
+INCLUDES       += -I$(TORCH_SCOPE_DIR)/include
+LDFLAGS        += -L$(TORCH_SCOPE_DIR)/lib -Wl,-rpath=$(TORCH_SCOPE_DIR)/lib
+LINK_LIBS	   += -ltorch_scope
 
 SRCS := $(notdir $(wildcard $(SRC_DIR)/*.cpp))
 OBJS := $(addprefix $(OBJ_DIR)/, $(patsubst %.cpp, %.o, $(SRCS)))
