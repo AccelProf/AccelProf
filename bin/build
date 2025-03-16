@@ -13,33 +13,33 @@ for arg in "$@"; do
 done
 echo "DEBUG is set to ${DEBUG}"
 
-CU_PROF_DIR=$(pwd)
-if [ ! -f "${CU_PROF_DIR}/bin/build" ]; then
-    echo "Please run this script in the root directory of CUProf"
+ACCEL_PROF_DIR=$(pwd)
+if [ ! -f "${ACCEL_PROF_DIR}/bin/build" ]; then
+    echo "Please run this script in the root directory of AccelProf"
     exit 1
 fi
 
 # check build env
-source ${CU_PROF_DIR}/bin/utils/check_build_env.sh
+source ${ACCEL_PROF_DIR}/bin/utils/check_build_env.sh
 
-cd $CU_PROF_DIR/sanalyzer/cxx_backtrace
-if [ ! -d "$CU_PROF_DIR/sanalyzer/cxx_backtrace/libbacktrace/backtrace" ]; then
+cd $ACCEL_PROF_DIR/sanalyzer/cpp_trace
+if [ ! -d "$ACCEL_PROF_DIR/sanalyzer/cpp_trace/libbacktrace/backtrace" ]; then
     ./build_libbacktrace
 fi
 # ./build_libbacktrace
-make -j install DEBUG=$DEBUG BACKTRACE_DIR=$CU_PROF_DIR/sanalyzer/cxx_backtrace/libbacktrace/backtrace
+make -j install DEBUG=$DEBUG BACKTRACE_DIR=$ACCEL_PROF_DIR/sanalyzer/cpp_trace/libbacktrace/backtrace
 
-cd $CU_PROF_DIR/sanalyzer/py_frame
-make -j install DEBUG=$DEBUG PYBIND11_DIR=$CU_PROF_DIR/sanalyzer/py_frame/pybind11
+cd $ACCEL_PROF_DIR/sanalyzer/py_frame
+make -j install DEBUG=$DEBUG PYBIND11_DIR=$ACCEL_PROF_DIR/sanalyzer/py_frame/pybind11
 
-cd $CU_PROF_DIR/sanalyzer
-make -j install DEBUG=$DEBUG SANITIZER_TOOL_DIR=$CU_PROF_DIR \
-                CXX_BACKTRACE_DIR=$CU_PROF_DIR/sanalyzer/cxx_backtrace/cxx_backtrace \
-                PY_FRAME_DIR=$CU_PROF_DIR/sanalyzer/py_frame/py_frame
+cd $ACCEL_PROF_DIR/sanalyzer
+make -j install DEBUG=$DEBUG SANITIZER_TOOL_DIR=$ACCEL_PROF_DIR \
+                CPP_TRACE_DIR=$ACCEL_PROF_DIR/sanalyzer/cpp_trace/cpp_trace \
+                PY_FRAME_DIR=$ACCEL_PROF_DIR/sanalyzer/py_frame/py_frame
 
-cd $CU_PROF_DIR/tensor_scope
+cd $ACCEL_PROF_DIR/tensor_scope
 make -j install DEBUG=$DEBUG
 
-cd $CU_PROF_DIR
-make -j DEBUG=$DEBUG SANALYZER_DIR=$CU_PROF_DIR/sanalyzer/sanalyzer \
-        TENSOR_SCOPE_DIR=$CU_PROF_DIR/tensor_scope/tensor_scope
+cd $ACCEL_PROF_DIR
+make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/sanalyzer/sanalyzer \
+        TENSOR_SCOPE_DIR=$ACCEL_PROF_DIR/tensor_scope/tensor_scope

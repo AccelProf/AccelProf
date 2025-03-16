@@ -100,7 +100,7 @@ void ModuleLoadedCallback(CUmodule module)
         return;
     }
 
-    const char* env_name = std::getenv("CU_PROF_HOME");
+    const char* env_name = std::getenv("ACCEL_PROF_HOME");
     std::string patch_path;
     if (env_name) {
         patch_path = std::string(env_name) + "/lib/gpu_patch/";

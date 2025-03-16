@@ -1,32 +1,32 @@
 #!/bin/bash
 
-CU_PROF_DIR=$(pwd)
-if [ ! -f "${CU_PROF_DIR}/bin/install" ]; then
-    echo "Please run this script in the root directory of CUProf"
+ACCEL_PROF_DIR=$(pwd)
+if [ ! -f "${ACCEL_PROF_DIR}/bin/install" ]; then
+    echo "Please run this script in the root directory of AccelProf"
     exit 1
 fi
 
 # check build env
-source ${CU_PROF_DIR}/bin/utils/check_build_env.sh
+source ${ACCEL_PROF_DIR}/bin/utils/check_build_env.sh
 
-cd $CU_PROF_DIR
+cd $ACCEL_PROF_DIR
 git submodule update --init --recursive
 
-cd $CU_PROF_DIR/sanalyzer/cxx_backtrace
+cd $ACCEL_PROF_DIR/sanalyzer/cpp_trace
 ./build_libbacktrace
-make -j install BACKTRACE_DIR=$CU_PROF_DIR/sanalyzer/cxx_backtrace/libbacktrace/backtrace
+make -j install BACKTRACE_DIR=$ACCEL_PROF_DIR/sanalyzer/cpp_trace/libbacktrace/backtrace
 
-cd $CU_PROF_DIR/sanalyzer/py_frame
-make -j install PYBIND11_DIR=$CU_PROF_DIR/sanalyzer/py_frame/pybind11
+cd $ACCEL_PROF_DIR/sanalyzer/py_frame
+make -j install PYBIND11_DIR=$ACCEL_PROF_DIR/sanalyzer/py_frame/pybind11
 
-cd $CU_PROF_DIR/sanalyzer
-make -j install SANITIZER_TOOL_DIR=$CU_PROF_DIR \
-                CXX_BACKTRACE_DIR=$CU_PROF_DIR/sanalyzer/cxx_backtrace/cxx_backtrace \
-                PY_FRAME_DIR=$CU_PROF_DIR/sanalyzer/py_frame/py_frame
+cd $ACCEL_PROF_DIR/sanalyzer
+make -j install SANITIZER_TOOL_DIR=$ACCEL_PROF_DIR \
+                CPP_TRACE_DIR=$ACCEL_PROF_DIR/sanalyzer/cpp_trace/cpp_trace \
+                PY_FRAME_DIR=$ACCEL_PROF_DIR/sanalyzer/py_frame/py_frame
 
-cd $CU_PROF_DIR/tensor_scope
+cd $ACCEL_PROF_DIR/tensor_scope
 make install -j
 
-cd $CU_PROF_DIR
-make -j SANALYZER_DIR=$CU_PROF_DIR/sanalyzer/sanalyzer \
-        TENSOR_SCOPE_DIR=$CU_PROF_DIR/tensor_scope/tensor_scope
+cd $ACCEL_PROF_DIR
+make -j SANALYZER_DIR=$ACCEL_PROF_DIR/sanalyzer/sanalyzer \
+        TENSOR_SCOPE_DIR=$ACCEL_PROF_DIR/tensor_scope/tensor_scope

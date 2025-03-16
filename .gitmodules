@@ -1,6 +1,6 @@
 [submodule "sanalyzer"]
 	path = sanalyzer
-	url = https://github.com/Lin-Mao/sanalyzer.git
+	url = https://github.com/AccelProf/sanalyzer.git
 [submodule "tensor_scope"]
 	path = tensor_scope
-	url = https://github.com/CUProf/tensor_scope.git
+	url = https://github.com/AccelProf/tensor_scope.git

@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# check if CUPROF_HOME is set
-if [ -z ${CU_PROF_HOME} ]; then
-    echo "CU_PROF_HOME is not set."
-    echo "Please set CU_PROF_HOME to the root directory of this repo."
+# check if ACCEL_PROF_HOME is set
+if [ -z ${ACCEL_PROF_HOME} ]; then
+    echo "ACCEL_PROF_HOME is not set."
+    echo "Please set ACCEL_PROF_HOME to the root directory of this repo."
     exit 1
 fi
 
@@ -28,7 +28,7 @@ function error_hint()
 error_message=$1
 cat <<EOF
 ${error_message}
-Tip: Use "cuprof -h" for more usage description.
+Tip: Use "accelprof -h" for more usage description.
 EOF
     exit 1
 }
@@ -91,7 +91,7 @@ echo "${EXECUTABLE} ${ARGS}"
 
 if [ ! -z ${VERBOSE} ]
 then
-    export OUTPUT_REDIRECT=${RESULT_DIR}/${YOSEMITE_APP_NAME}.cuprof.log
+    export OUTPUT_REDIRECT=${RESULT_DIR}/${YOSEMITE_APP_NAME}.accelprof.log
 else
     export OUTPUT_REDIRECT=/dev/null
 fi
@@ -116,28 +116,28 @@ echo "Running the ${YOSEMITE_TOOL_NAME} tool for ${YOSEMITE_APP_NAME}..."
 
 
 # output the command and execution
-printf "%-25s: %s\n" "[CUPROF INFO] LD_PRELOAD" \
-        "${CU_PROF_HOME}/lib/libcompute_sanitizer.so" > ${OUTPUT_REDIRECT}
-printf "%-25s: %s %s\n" "[CUPROF INFO] COMMAND" \
+printf "%-25s: %s\n" "[ACCELPROF INFO] LD_PRELOAD" \
+        "${ACCEL_PROF_HOME}/lib/libcompute_sanitizer.so" > ${OUTPUT_REDIRECT}
+printf "%-25s: %s %s\n" "[ACCELPROF INFO] COMMAND" \
         "${EXECUTABLE}" "${ARGS}" >> ${OUTPUT_REDIRECT}
 
 # Record start time in seconds since epoch
 start_time=$(date +%s)
-printf "%-25s: %s\n\n" "[CUPROF INFO] START TIME" "$(date)" >> ${OUTPUT_REDIRECT}
+printf "%-25s: %s\n\n" "[ACCELPROF INFO] START TIME" "$(date)" >> ${OUTPUT_REDIRECT}
 
-# cuprof
-LD_PRELOAD_LIB=${CU_PROF_HOME}/lib/libcompute_sanitizer.so
+# accelprof
+LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/libcompute_sanitizer.so
 LD_PRELOAD=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} &>> ${OUTPUT_REDIRECT}
 
 # check if the above execution is successful
 if [ $? -ne 0 ]; then
-    echo "error: Fail to run the application with CUProf. Please check ${OUTPUT_REDIRECT} for more details."
+    echo "error: Fail to run the application with AccelProf. Please check ${OUTPUT_REDIRECT} for more details."
     echo ""
 fi
 
 # Record end time and calculate elapsed time
 end_time=$(date +%s)
 elapsed=$((end_time - start_time))
-printf "%-25s: %s\n" "[CUPROF INFO] END TIME" "$(date)" >> ${OUTPUT_REDIRECT}
-printf "%-25s: %02d:%02d:%02d\n" "[CUPROF INFO] ELAPSED" \
+printf "%-25s: %s\n" "[ACCELPROF INFO] END TIME" "$(date)" >> ${OUTPUT_REDIRECT}
+printf "%-25s: %02d:%02d:%02d\n" "[ACCELPROF INFO] ELAPSED" \
         $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60)) >> ${OUTPUT_REDIRECT}
