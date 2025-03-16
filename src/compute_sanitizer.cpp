@@ -3,7 +3,7 @@
 #include "sanitizer_helper.h"
 #include "gpu_patch.h"
 #include "sanalyzer.h"
-#include "tensor_scope.h"
+#include "torch_scope.h"
 
 #include <sanitizer.h>
 #include <vector_types.h>
@@ -73,6 +73,14 @@ void TensorFreeCallback(uint64_t ptr, int64_t size, int64_t allocated, int64_t r
     yosemite_tensor_free_callback(ptr, size, allocated, reserved);
 }
 
+
+void OperatorStartCallback(std::string op_name) {
+    if (!sanitizer_options.sanitizer_callback_enabled) {
+        return;
+    }
+
+    PRINT("[SANITIZER INFO] Torch operator start: %s\n", op_name.c_str());
+}
 
 
 void ModuleUnloadedCallback(CUmodule module) {
@@ -547,8 +555,10 @@ int InitializeInjection()
 
     // register tensor malloc and free callback
     if (sanitizer_options.torch_prof_enabled) {
-        tensor_scope_enable();
-        register_tensor_scope(TensorMallocCallback, TensorFreeCallback);
+        enable_torch_scope();
+        register_torch_scope_callback(TORCH_SCOPE_TENSOR_MALLOC, (torch_scope_callback_t)TensorMallocCallback);
+        register_torch_scope_callback(TORCH_SCOPE_TENSOR_FREE, (torch_scope_callback_t)TensorFreeCallback);
+        register_torch_scope_callback(TORCH_SCOPE_OPERATOR_START, (torch_scope_callback_t)OperatorStartCallback);
     }
 
     return 0;
