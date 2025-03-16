@@ -1,26 +1,26 @@
 #!/bin/bash
 
-CU_PROF_DIR=$(pwd)
-if [ ! -f "${CU_PROF_DIR}/bin/clean" ]; then
-    echo "Please run this script in the root directory of CUProf"
+ACCEL_PROF_DIR=$(pwd)
+if [ ! -f "${ACCEL_PROF_DIR}/bin/clean" ]; then
+    echo "Please run this script in the root directory of AccelProf"
     exit 1
 fi
 
-cd $CU_PROF_DIR
+cd $ACCEL_PROF_DIR
 make clean
 
-cd $CU_PROF_DIR/tensor_scope
+cd $ACCEL_PROF_DIR/tensor_scope
 make clean
 
-cd $CU_PROF_DIR/sanalyzer
+cd $ACCEL_PROF_DIR/sanalyzer
 make clean
 
-cd $CU_PROF_DIR/sanalyzer/cxx_backtrace
+cd $ACCEL_PROF_DIR/sanalyzer/cpp_trace
 make clean
 
-cd $CU_PROF_DIR/sanalyzer/cxx_backtrace/libbacktrace
+cd $ACCEL_PROF_DIR/sanalyzer/cpp_trace/libbacktrace
 rm -rf backtrace
 rm -rf build
 
-cd $CU_PROF_DIR/sanalyzer/py_frame
+cd $ACCEL_PROF_DIR/sanalyzer/py_frame
 make clean
