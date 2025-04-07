@@ -59,7 +59,7 @@ void TensorMallocCallback(uint64_t ptr, int64_t size, int64_t allocated, int64_t
         return;
     }
 
-    PRINT("[SANITIZER INFO] Malloc tensor %p with size %ld, allocated %ld, reserved %ld\n", ptr, size, allocated, reserved);
+    PRINT("[SANITIZER INFO] Malloc tensor %p with size %ld, allocated %ld, reserved %ld\n", (void*)ptr, size, allocated, reserved);
     yosemite_tensor_malloc_callback(ptr, size, allocated, reserved);
 }
 
@@ -69,7 +69,7 @@ void TensorFreeCallback(uint64_t ptr, int64_t size, int64_t allocated, int64_t r
         return;
     }
 
-    PRINT("[SANITIZER INFO] Free tensor %p with size %ld, allocated %ld, reserved %ld\n", ptr, size, allocated, reserved);
+    PRINT("[SANITIZER INFO] Free tensor %p with size %ld, allocated %ld, reserved %ld\n", (void*)ptr, size, allocated, reserved);
     yosemite_tensor_free_callback(ptr, size, allocated, reserved);
 }
 
@@ -381,7 +381,7 @@ void ComputeSanitizerCallback(
                         break;
 
                     PRINT("[SANITIZER INFO] Malloc memory %p with size %lu (flag: %u)\n",
-                            pModuleData->address, pModuleData->size, pModuleData->flags);
+                            (void*)pModuleData->address, pModuleData->size, pModuleData->flags);
 
                     yosemite_alloc_callback(pModuleData->address, pModuleData->size, pModuleData->flags);
                     break;
@@ -393,7 +393,7 @@ void ComputeSanitizerCallback(
                         break;
 
                     PRINT("[SANITIZER INFO] Free memory %p with size %lu (flag: %u)\n",
-                            pModuleData->address, pModuleData->size, pModuleData->flags);
+                            (void*)pModuleData->address, pModuleData->size, pModuleData->flags);
 
                     yosemite_free_callback(pModuleData->address, pModuleData->size, pModuleData->flags);
                     break;
@@ -456,7 +456,7 @@ void ComputeSanitizerCallback(
                                      (pMemcpyData->direction == SANITIZER_MEMCPY_DIRECTION_DEVICE_TO_HOST) ? "D2H" :
                                      (pMemcpyData->direction == SANITIZER_MEMCPY_DIRECTION_DEVICE_TO_DEVICE) ? "D2D" : "UNKNOWN";
                     PRINT("[SANITIZER INFO] Memcpy %p -> %p with size %lu, async: %d, direction: %s\n",
-                            pMemcpyData->srcAddress, pMemcpyData->dstAddress, pMemcpyData->size,
+                            (void*)pMemcpyData->srcAddress, (void*)pMemcpyData->dstAddress, pMemcpyData->size,
                             pMemcpyData->isAsync, direction);
 
                     yosemite_memcpy_callback(pMemcpyData->dstAddress, pMemcpyData->srcAddress,pMemcpyData->size,
@@ -473,8 +473,8 @@ void ComputeSanitizerCallback(
                 case SANITIZER_CBID_MEMSET_STARTING:
                 {
                     auto* pMemsetData = (Sanitizer_MemsetData*)cbdata;
-                    PRINT("[SANITIZER INFO] Memset %p with size %u, value %d, async: %d\n",
-                            pMemsetData->address, pMemsetData->width, pMemsetData->value, pMemsetData->isAsync);
+                    PRINT("[SANITIZER INFO] Memset %p with size %lu, value %d, async: %d\n",
+                            (void*)pMemsetData->address, pMemsetData->width, pMemsetData->value, pMemsetData->isAsync);
 
                     yosemite_memset_callback(pMemsetData->address, pMemsetData->width,
                                                 pMemsetData->value, pMemsetData->isAsync);
