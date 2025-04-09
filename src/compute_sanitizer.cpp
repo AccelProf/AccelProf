@@ -83,6 +83,14 @@ void OperatorStartCallback(std::string op_name) {
 }
 
 
+void OperatorEndCallback(std::string op_name) {
+    if (!sanitizer_options.sanitizer_callback_enabled) {
+        return;
+    }
+
+    PRINT("[SANITIZER INFO] Torch operator end: %s\n", op_name.c_str());
+}
+
 void ModuleUnloadedCallback(CUmodule module) {
     if (sanitizer_options.patch_name == GPU_NO_PATCH) {
         return;
@@ -559,6 +567,7 @@ int InitializeInjection()
         register_torch_scope_callback(TORCH_SCOPE_TENSOR_MALLOC, (torch_scope_callback_t)TensorMallocCallback);
         register_torch_scope_callback(TORCH_SCOPE_TENSOR_FREE, (torch_scope_callback_t)TensorFreeCallback);
         register_torch_scope_callback(TORCH_SCOPE_OPERATOR_START, (torch_scope_callback_t)OperatorStartCallback);
+        register_torch_scope_callback(TORCH_SCOPE_OPERATOR_END, (torch_scope_callback_t)OperatorEndCallback);
     }
 
     return 0;
