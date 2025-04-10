@@ -7,3 +7,6 @@
 [submodule "nv-compute"]
 	path = nv-compute
 	url = https://github.com/AccelProf/nv-compute.git
+[submodule "nv-nvbit"]
+	path = nv-nvbit
+	url = https://github.com/AccelProf/nv-nvbit.git
