@@ -6,7 +6,7 @@ if [ ! -f "${ACCEL_PROF_DIR}/bin/clean" ]; then
     exit 1
 fi
 
-cd $ACCEL_PROF_DIR
+cd $ACCEL_PROF_DIR/nv-compute
 make clean
 
 cd $ACCEL_PROF_DIR/tensor_scope
