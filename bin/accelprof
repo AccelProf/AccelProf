@@ -19,6 +19,14 @@ Usage:
         app_metric: Collect metrics for CUDA Applications.
         code_check: Check CUDA code for potential issues.
         hot_analysis: Analyze hot memory regions.
+    -d <device_name>
+        Specify the device vendor name.
+        Valid values:
+            - nvc (NVIDIA Compute Sanitizer, default)
+            - nvbit (NVIDIA nvbit)
+            - rocm (AMD)
+    -v
+        Verbose mode.
 EOF
     exit 0
 }
@@ -42,6 +50,10 @@ do
     case "${arg}" in
         -t)
         export TOOL=$1
+        shift
+        ;;
+        -d)
+        export DEVICE=$1
         shift
         ;;
         -v)
@@ -77,6 +89,16 @@ then
     echo "Result directory: ${RESULT_DIR}"
 else
     export RESULT_DIR=.
+fi
+
+if [ "${DEVICE}" = "nvc" ]; then
+    export YOSEMITE_DEVICE=nvc
+elif [ "${DEVICE}" = "nvbit" ]; then
+    export YOSEMITE_DEVICE=nvbit
+elif [ "${DEVICE}" = "rocm" ]; then
+    export YOSEMITE_DEVICE=rocm
+else
+    export YOSEMITE_DEVICE=nvc
 fi
 
 if [ ${EXECUTABLE} == "python" ] || [ ${EXECUTABLE} == "python3" ];
@@ -126,13 +148,24 @@ start_time=$(date +%s)
 printf "%-25s: %s\n\n" "[ACCELPROF INFO] START TIME" "$(date)" >> ${OUTPUT_REDIRECT}
 
 # accelprof
-LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/libcompute_sanitizer.so
+
+if [ ${YOSEMITE_DEVICE} == "nvc" ]
+then
+    LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/libcompute_sanitizer.so
+elif [ ${YOSEMITE_DEVICE} == "nvbit" ]
+then
+    LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/libnv-nvbit.so
+else
+    LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/libcompute_sanitizer.so
+fi
+
 LD_PRELOAD=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} &>> ${OUTPUT_REDIRECT}
 
 # check if the above execution is successful
 if [ $? -ne 0 ]; then
     echo "error: Fail to run the application with AccelProf. Please check ${OUTPUT_REDIRECT} for more details."
     echo ""
+    exit 1
 fi
 
 # Record end time and calculate elapsed time

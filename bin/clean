@@ -9,6 +9,9 @@ fi
 cd $ACCEL_PROF_DIR/nv-compute
 make clean
 
+cd $ACCEL_PROF_DIR/nv-nvbit
+make clean
+
 cd $ACCEL_PROF_DIR/tensor_scope
 make clean
 
