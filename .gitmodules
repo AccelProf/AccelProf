@@ -4,3 +4,6 @@
 [submodule "tensor_scope"]
 	path = tensor_scope
 	url = https://github.com/AccelProf/tensor_scope.git
+[submodule "nv-compute"]
+	path = nv-compute
+	url = https://github.com/AccelProf/nv-compute.git
