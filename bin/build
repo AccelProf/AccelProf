@@ -33,13 +33,17 @@ cd $ACCEL_PROF_DIR/sanalyzer/py_frame
 make -j install DEBUG=$DEBUG PYBIND11_DIR=$ACCEL_PROF_DIR/sanalyzer/py_frame/pybind11
 
 cd $ACCEL_PROF_DIR/sanalyzer
-make -j install DEBUG=$DEBUG SANITIZER_TOOL_DIR=$ACCEL_PROF_DIR \
+make -j install DEBUG=$DEBUG SANITIZER_TOOL_DIR=$ACCEL_PROF_DIR/nv-compute \
                 CPP_TRACE_DIR=$ACCEL_PROF_DIR/sanalyzer/cpp_trace/cpp_trace \
                 PY_FRAME_DIR=$ACCEL_PROF_DIR/sanalyzer/py_frame/py_frame
 
 cd $ACCEL_PROF_DIR/tensor_scope
 make -j install DEBUG=$DEBUG
 
-cd $ACCEL_PROF_DIR
+cd $ACCEL_PROF_DIR/nv-compute
 make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/sanalyzer/sanalyzer \
-        TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/tensor_scope/torch_scope
+        TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/tensor_scope/torch_scope \
+        PATCH_SRC_DIR=$ACCEL_PROF_DIR/nv-compute/gpu_src
+
+mkdir -p $ACCEL_PROF_DIR/lib
+cp $ACCEL_PROF_DIR/nv-compute/lib/*.so $ACCEL_PROF_DIR/lib/
