@@ -1,5 +1,7 @@
+DEBUG ?= 0
+
 all:
-	./bin/build
+	./bin/build DEBUG=$(DEBUG)
 
 clean:
 	./bin/clean
