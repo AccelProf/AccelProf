@@ -48,7 +48,7 @@ make -j install DEBUG=$DEBUG
 ENABLE_COMPUTE_SANALYZER=1
 if [ $ENABLE_COMPUTE_SANALYZER -eq 1 ]; then
     cd $ACCEL_PROF_DIR/nv-compute
-    make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/sanalyzer/sanalyzer \
+    make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/sanalyzer/ \
         TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/tensor_scope/torch_scope \
         PATCH_SRC_DIR=$ACCEL_PROF_DIR/nv-compute/gpu_src
 
