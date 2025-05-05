@@ -3,7 +3,7 @@
 # -- Project information
 
 project = 'AccelProf'
-copyright = '2025, Mao Lin'
+copyright = '2025'
 author = 'Mao Lin'
 
 release = '0.1'
