@@ -134,6 +134,9 @@ then
 elif [ ${TOOL} == "uvm_advisor" ]
 then
     export YOSEMITE_TOOL_NAME=uvm_advisor
+elif [ ${TOOL} == "app_analysis" ]
+then
+    export YOSEMITE_TOOL_NAME=app_analysis
 else
     error_hint "Invalid tool name."
 fi
