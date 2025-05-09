@@ -57,10 +57,10 @@ fi
 
 
 # build nv-nvbit
-ENABLE_NVBIT_TOOL=0
+ENABLE_NVBIT_TOOL=1
 if [ $ENABLE_NVBIT_TOOL -eq 1 ]; then
     cd $ACCEL_PROF_DIR/nv-nvbit
-    make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/sanalyzer/sanalyzer
+    make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/sanalyzer/
 
     cp $ACCEL_PROF_DIR/nv-nvbit/lib/*.so $ACCEL_PROF_DIR/lib/
 fi
