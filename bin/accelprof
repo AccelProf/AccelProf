@@ -181,5 +181,5 @@ fi
 end_time=$(date +%s)
 elapsed=$((end_time - start_time))
 printf "%-25s: %s\n" "[ACCELPROF INFO] END TIME" "$(date)" >> ${OUTPUT_REDIRECT}
-printf "%-25s: %02d:%02d:%02d\n" "[ACCELPROF INFO] ELAPSED" \
+printf "%-25s: %02d:%02d:%02d\n" "[ACCELPROF INFO] ELAPSED TIME" \
         $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60)) >> ${OUTPUT_REDIRECT}
