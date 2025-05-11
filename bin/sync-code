@@ -8,6 +8,7 @@ fi
 
 GIT_PATH_LIST=(
     $ACCEL_PROF_DIR/
+    $ACCEL_PROF_DIR/docs
     $ACCEL_PROF_DIR/nv-compute
     $ACCEL_PROF_DIR/nv-nvbit
     $ACCEL_PROF_DIR/tensor_scope
@@ -18,6 +19,7 @@ GIT_PATH_LIST=(
     $ACCEL_PROF_DIR/sanalyzer/py_frame/pybind11
 )
 BRANCH_LIST=(
+    main
     main
     main
     main
