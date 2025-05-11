@@ -10,3 +10,6 @@
 [submodule "nv-nvbit"]
 	path = nv-nvbit
 	url = https://github.com/AccelProf/nv-nvbit.git
+[submodule "docs"]
+	path = docs
+	url = https://github.com/AccelProf/docs.git
