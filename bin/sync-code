@@ -1,0 +1,70 @@
+#!/bin/bash
+
+ACCEL_PROF_DIR=$(pwd)
+if [ ! -f "${ACCEL_PROF_DIR}/bin/clean" ]; then
+    echo "Please run this script in the root directory of AccelProf"
+    exit 1
+fi
+
+GIT_PATH_LIST=(
+    $ACCEL_PROF_DIR/
+    $ACCEL_PROF_DIR/nv-compute
+    $ACCEL_PROF_DIR/nv-nvbit
+    $ACCEL_PROF_DIR/tensor_scope
+    $ACCEL_PROF_DIR/sanalyzer
+    $ACCEL_PROF_DIR/sanalyzer/cpp_trace
+    $ACCEL_PROF_DIR/sanalyzer/cpp_trace/libbacktrace
+    $ACCEL_PROF_DIR/sanalyzer/py_frame
+    $ACCEL_PROF_DIR/sanalyzer/py_frame/pybind11
+)
+BRANCH_LIST=(
+    main
+    main
+    main
+    main
+    main
+    main
+    master
+    main
+    master
+)
+
+check_git_clean() {
+  # Check for uncommitted changes
+  if [[ -n $(git status --porcelain) ]]; then
+    echo "❌ Error: Uncommitted changes found in the working directory."
+    git status --short
+    exit 1
+  fi
+
+  # Check for unpushed commits
+  if [[ -n $(git log --branches --not --remotes) ]]; then
+    echo "❌ Error: There are commits that have not been pushed to the remote."
+    git --no-pager log --oneline --branches --not --remotes
+    exit 1
+  fi
+
+  echo "✅ Git repository is clean and fully pushed."
+}
+
+# check git clean
+for path in ${GIT_PATH_LIST[@]}; do
+    cd $path
+    check_git_clean
+done
+
+cd $ACCEL_PROF_DIR
+git submodule sync
+git submodule update --init --recursive
+git submodule update --remote --recursive
+
+for i in ${!GIT_PATH_LIST[@]}; do
+    path=${GIT_PATH_LIST[$i]}
+    branch=${BRANCH_LIST[$i]}
+    echo "✅ Syncing $(basename "$path") to $branch"
+    cd $path
+    git checkout $branch &> /dev/null
+    git pull &> /dev/null
+done
+
+echo "✅ Syncing done"
