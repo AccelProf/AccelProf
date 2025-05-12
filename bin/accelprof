@@ -44,6 +44,7 @@ EOF
 # for debugging
 # set -x
 
+OPTION_STR=""
 while [ -n "$1" ]
 do
     arg="$1" ; shift
@@ -51,13 +52,16 @@ do
         -t)
         export TOOL=$1
         shift
+        OPTION_STR="${OPTION_STR} -t ${TOOL}"
         ;;
         -d)
         export DEVICE=$1
         shift
+        OPTION_STR="${OPTION_STR} -d ${DEVICE}"
         ;;
         -v)
         export VERBOSE=1
+        OPTION_STR="${OPTION_STR} -v"
         ;;
         -h)
         help_func
@@ -149,6 +153,8 @@ echo "Running the ${YOSEMITE_TOOL_NAME} tool for ${YOSEMITE_APP_NAME}..."
 # output the command and execution
 printf "%-25s: %s\n" "[ACCELPROF INFO] LD_PRELOAD" \
         "${ACCEL_PROF_HOME}/lib/libcompute_sanitizer.so" > ${OUTPUT_REDIRECT}
+printf "%-25s: %s\n" "[ACCELPROF INFO] OPTIONS" \
+        "-t ${YOSEMITE_TOOL_NAME} -d ${YOSEMITE_DEVICE} -v" >> ${OUTPUT_REDIRECT}
 printf "%-25s: %s %s\n" "[ACCELPROF INFO] COMMAND" \
         "${EXECUTABLE}" "${ARGS}" >> ${OUTPUT_REDIRECT}
 
