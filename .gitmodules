@@ -13,3 +13,6 @@
 [submodule "docs"]
 	path = docs
 	url = https://github.com/AccelProf/docs.git
+[submodule "amd-rocm"]
+	path = amd-rocm
+	url = https://github.com/AccelProf/amd-rocm.git
