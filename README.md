@@ -1,7 +1,9 @@
 # AccelProf
 
 
-## Installation
+## Quick Start
+
+* Installation
 
 ```shell
 # Download
@@ -12,16 +14,16 @@ git submodule update --init --recursive
 bash ./bin/utils/check_build_env.sh
 
 # Build and install
-./bin/install
+./bin/build
 
 # Set env
 export ACCEL_PROF_HOME=$(pwd)
 export PATH=${ACCEL_PROF_HOME}/bin:${PATH}
 ```
 
-## Basic usage
+* Basic Usage
 
 ```shell
 # analyze the accelerator applications
-accelprof -v -t app_metric {executable} {excutatble args}
+accelprof -v -t app_analysis {executable} {excutatble args}
 ```
