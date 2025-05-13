@@ -16,3 +16,9 @@
 [submodule "amd-rocm"]
 	path = amd-rocm
 	url = https://github.com/AccelProf/amd-rocm.git
+[submodule "third_party/libbacktrace"]
+	path = third_party/libbacktrace
+	url = https://github.com/ianlancetaylor/libbacktrace.git
+[submodule "third_party/pybind11"]
+	path = third_party/pybind11
+	url = https://github.com/pybind/pybind11.git

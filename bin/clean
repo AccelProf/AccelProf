@@ -6,6 +6,10 @@ if [ ! -f "${ACCEL_PROF_DIR}/bin/clean" ]; then
     exit 1
 fi
 
+cd $ACCEL_PROF_DIR
+rm -rf lib
+rm -rf build
+
 cd $ACCEL_PROF_DIR/nv-compute
 make clean
 
@@ -20,10 +24,6 @@ make clean
 
 cd $ACCEL_PROF_DIR/sanalyzer/cpp_trace
 make clean
-
-cd $ACCEL_PROF_DIR/sanalyzer/cpp_trace/libbacktrace
-rm -rf backtrace
-rm -rf build
 
 cd $ACCEL_PROF_DIR/sanalyzer/py_frame
 make clean

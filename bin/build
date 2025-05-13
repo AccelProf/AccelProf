@@ -19,38 +19,49 @@ if [ ! -f "${ACCEL_PROF_DIR}/bin/build" ]; then
     exit 1
 fi
 
-# create lib directory
+# create directory
 mkdir -p $ACCEL_PROF_DIR/lib
+mkdir -p $ACCEL_PROF_DIR/build
 
 # check build env
 source ${ACCEL_PROF_DIR}/bin/utils/check_build_env.sh
 
+# build libbacktrace
 cd $ACCEL_PROF_DIR/sanalyzer/cpp_trace
-if [ ! -d "$ACCEL_PROF_DIR/sanalyzer/cpp_trace/libbacktrace/backtrace" ]; then
-    ./build_libbacktrace
+if [ ! -d "$ACCEL_PROF_DIR/build/backtrace" ]; then
+    source ${ACCEL_PROF_DIR}/bin/utils/build_libbacktrace
 fi
-# ./build_libbacktrace
-make -j install DEBUG=$DEBUG BACKTRACE_DIR=$ACCEL_PROF_DIR/sanalyzer/cpp_trace/libbacktrace/backtrace
 
+# build cpp_trace
+cd $ACCEL_PROF_DIR/sanalyzer/cpp_trace
+make -j install DEBUG=$DEBUG BACKTRACE_DIR=$ACCEL_PROF_DIR/build/backtrace \
+                             INSTALL_DIR=$ACCEL_PROF_DIR/build/sanalyzer/cpp_trace
+
+# build py_frame
 cd $ACCEL_PROF_DIR/sanalyzer/py_frame
-make -j install DEBUG=$DEBUG PYBIND11_DIR=$ACCEL_PROF_DIR/sanalyzer/py_frame/pybind11
+make -j install DEBUG=$DEBUG PYBIND11_DIR=$ACCEL_PROF_DIR/third_party/pybind11 \
+                             INSTALL_DIR=$ACCEL_PROF_DIR/build/sanalyzer/py_frame
 
+# build sanalyzer
 cd $ACCEL_PROF_DIR/sanalyzer
 make -j install DEBUG=$DEBUG SANITIZER_TOOL_DIR=$ACCEL_PROF_DIR/nv-compute \
-                CPP_TRACE_DIR=$ACCEL_PROF_DIR/sanalyzer/cpp_trace/cpp_trace \
-                PY_FRAME_DIR=$ACCEL_PROF_DIR/sanalyzer/py_frame/py_frame
+                             NV_NVBIT_DIR=$ACCEL_PROF_DIR/nv-nvbit \
+                             CPP_TRACE_DIR=$ACCEL_PROF_DIR/build/sanalyzer/cpp_trace \
+                             PY_FRAME_DIR=$ACCEL_PROF_DIR/build/sanalyzer/py_frame \
+                             INSTALL_DIR=$ACCEL_PROF_DIR/build/sanalyzer
 
+# build tensor_scope
 cd $ACCEL_PROF_DIR/tensor_scope
-make -j install DEBUG=$DEBUG
+make -j install DEBUG=$DEBUG INSTALL_DIR=$ACCEL_PROF_DIR/build/tensor_scope
 
 
 # build nv-compute
 ENABLE_COMPUTE_SANALYZER=1
 if [ $ENABLE_COMPUTE_SANALYZER -eq 1 ]; then
     cd $ACCEL_PROF_DIR/nv-compute
-    make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/sanalyzer/ \
-        TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/tensor_scope/torch_scope \
-        PATCH_SRC_DIR=$ACCEL_PROF_DIR/nv-compute/gpu_src
+    make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer \
+                         TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope \
+                         PATCH_SRC_DIR=$ACCEL_PROF_DIR/nv-compute/gpu_src
 
     cp $ACCEL_PROF_DIR/nv-compute/lib/*.so $ACCEL_PROF_DIR/lib/
 fi
@@ -60,8 +71,9 @@ fi
 ENABLE_NVBIT_TOOL=1
 if [ $ENABLE_NVBIT_TOOL -eq 1 ]; then
     cd $ACCEL_PROF_DIR/nv-nvbit
-    make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/sanalyzer/ \
-        TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/tensor_scope/torch_scope
+    make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer \
+                         TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope \
+                         INSTALL_DIR=$ACCEL_PROF_DIR/build/nv-nvbit
 
     cp $ACCEL_PROF_DIR/nv-nvbit/lib/*.so $ACCEL_PROF_DIR/lib/
 fi
