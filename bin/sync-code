@@ -54,7 +54,7 @@ done
 cd $ACCEL_PROF_DIR
 git submodule sync
 git submodule update --init --recursive
-git submodule update --remote --recursive
+# git submodule update --remote --recursive
 
 for i in ${!GIT_PATH_LIST[@]}; do
     path=${GIT_PATH_LIST[$i]}
