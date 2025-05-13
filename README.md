@@ -1,4 +1,4 @@
-# AccelProf - A Program Analysis Tool Framework for Accelerators
+# AccelProf - A Program Analysis Tool Framework
 
 
 ## Quick Start
