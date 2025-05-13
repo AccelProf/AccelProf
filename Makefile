@@ -1,11 +1,13 @@
 PROJECT := torch_scope
+CONFIGS := Makefile.config
 
+include $(CONFIGS)
 
 OBJ_DIR := obj
 SRC_DIR := src
 INC_DIR := include
 LIB_DIR := lib
-PREFIX := torch_scope
+PREFIX := $(INSTALL_DIR)
 
 LIB := $(LIB_DIR)/lib$(PROJECT).so
 CUR_DIR := $(shell pwd)
