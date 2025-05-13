@@ -14,9 +14,7 @@ GIT_PATH_LIST=(
     $ACCEL_PROF_DIR/tensor_scope
     $ACCEL_PROF_DIR/sanalyzer
     $ACCEL_PROF_DIR/sanalyzer/cpp_trace
-    $ACCEL_PROF_DIR/sanalyzer/cpp_trace/libbacktrace
     $ACCEL_PROF_DIR/sanalyzer/py_frame
-    $ACCEL_PROF_DIR/sanalyzer/py_frame/pybind11
 )
 BRANCH_LIST=(
     main
@@ -26,9 +24,7 @@ BRANCH_LIST=(
     main
     main
     main
-    master
     main
-    master
 )
 
 check_git_clean() {
