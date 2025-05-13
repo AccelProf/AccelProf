@@ -1,0 +1,10 @@
+#!/bin/bash
+
+prefix_dir=$ACCEL_PROF_DIR/build/backtrace
+
+mkdir -p $ACCEL_PROF_DIR/build/backtrace/build
+cd $ACCEL_PROF_DIR/build/backtrace/build
+$ACCEL_PROF_DIR/third_party/libbacktrace/configure --prefix=$prefix_dir --enable-shared --disable-static
+
+make -j$(nproc)
+make install
