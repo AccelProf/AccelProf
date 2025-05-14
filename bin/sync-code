@@ -11,12 +11,14 @@ GIT_PATH_LIST=(
     $ACCEL_PROF_DIR/docs
     $ACCEL_PROF_DIR/nv-compute
     $ACCEL_PROF_DIR/nv-nvbit
+    $ACCEL_PROF_DIR/amd-rocm
     $ACCEL_PROF_DIR/tensor_scope
     $ACCEL_PROF_DIR/sanalyzer
     $ACCEL_PROF_DIR/sanalyzer/cpp_trace
     $ACCEL_PROF_DIR/sanalyzer/py_frame
 )
 BRANCH_LIST=(
+    main
     main
     main
     main
