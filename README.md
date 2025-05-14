@@ -1,5 +1,7 @@
-# AccelProf - A Program Analysis Tool Framework
-
+![](./assets/banner.jpg)
+------------------------------------------------------------
+[![](https://img.shields.io/badge/license-MIT-green?logo=github)](https://github.com/AccelProf/AccelProf/blob/main/LICENSE)
+[![Documentation Status](https://readthedocs.org/projects/accelprofdocs/badge/?version=latest)](https://accelprofdocs.readthedocs.io/en/latest/)
 
 ## Quick Start
 
