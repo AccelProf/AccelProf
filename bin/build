@@ -72,8 +72,17 @@ ENABLE_NVBIT_TOOL=1
 if [ $ENABLE_NVBIT_TOOL -eq 1 ]; then
     cd $ACCEL_PROF_DIR/nv-nvbit
     make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer \
-                         TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope \
-                         INSTALL_DIR=$ACCEL_PROF_DIR/build/nv-nvbit
+                         TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope
 
     cp $ACCEL_PROF_DIR/nv-nvbit/lib/*.so $ACCEL_PROF_DIR/lib/
+fi
+
+
+# build amd-rocm (Requires AMD ROCm development environment)
+ENABLE_AMD_ROCM=0
+if [ $ENABLE_AMD_ROCM -eq 1 ]; then
+    cd $ACCEL_PROF_DIR/amd-rocm
+    make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer
+
+    cp $ACCEL_PROF_DIR/amd-rocm/build/lib/*.so $ACCEL_PROF_DIR/lib/
 fi
