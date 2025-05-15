@@ -3,6 +3,13 @@
 [![](https://img.shields.io/badge/license-MIT-green?logo=github)](https://github.com/AccelProf/AccelProf/blob/main/LICENSE)
 [![CodeFactor](https://www.codefactor.io/repository/github/accelprof/accelprof/badge?s=22e13e1fdcf3545856eaa81211ffe11221babe01)](https://www.codefactor.io/repository/github/accelprof/accelprof)
 [![Documentation Status](https://readthedocs.org/projects/accelprofdocs/badge/?version=latest)](https://accelprofdocs.readthedocs.io/en/latest/)
+[![Static Badge](https://img.shields.io/badge/build-passing-brightgreen?logo=Linux&label=Linux)](https://github.com/AccelProf)
+[![Static Badge](https://img.shields.io/badge/build-passing-brightgreen?logo=NVIDIA&label=NVIDIA)](https://github.com/AccelProf)
+[![Static Badge](https://img.shields.io/badge/build-passing-brightgreen?logo=AMD&label=AMD)](https://github.com/AccelProf)
+
+
+
+
 
 ## Quick Start
 
