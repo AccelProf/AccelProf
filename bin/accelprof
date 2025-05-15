@@ -174,7 +174,7 @@ else
     LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/libcompute_sanitizer.so
 fi
 
-LD_PRELOAD=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} &>> ${OUTPUT_REDIRECT}
+LD_PRELOAD=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
 
 # check if the above execution is successful
 if [ $? -ne 0 ]; then
