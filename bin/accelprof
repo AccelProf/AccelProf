@@ -118,6 +118,7 @@ echo "${EXECUTABLE} ${ARGS}"
 if [ ! -z ${VERBOSE} ]
 then
     export OUTPUT_REDIRECT=${RESULT_DIR}/${YOSEMITE_APP_NAME}.accelprof.log
+    echo "stdout redirect: ${OUTPUT_REDIRECT}"
 else
     export OUTPUT_REDIRECT=/dev/null
 fi
@@ -150,17 +151,27 @@ fi
 echo "Running the ${YOSEMITE_TOOL_NAME} tool for ${YOSEMITE_APP_NAME}..."
 
 
-# output the command and execution
-printf "%-25s: %s\n" "[ACCELPROF INFO] LD_PRELOAD" \
-        "${ACCEL_PROF_HOME}/lib/libcompute_sanitizer.so" > ${OUTPUT_REDIRECT}
-printf "%-25s: %s\n" "[ACCELPROF INFO] OPTIONS" \
-        "-t ${YOSEMITE_TOOL_NAME} -d ${YOSEMITE_DEVICE} -v" >> ${OUTPUT_REDIRECT}
-printf "%-25s: %s %s\n" "[ACCELPROF INFO] COMMAND" \
+# Check the version of accelprof
+commit_hash=$(git -C "$ACCEL_PROF_HOME" rev-parse HEAD)
+if [[ -n $(git -C "$ACCEL_PROF_HOME" status --porcelain) ]]; then
+    modified=1
+else
+    modified=0
+fi
+
+# output metadata
+printf "%-30s: %s\n" "[ACCELPROF INFO] VERSION" \
+        "${commit_hash}, modified ${modified}" > ${OUTPUT_REDIRECT}
+printf "%-30s: %s\n" "[ACCELPROF INFO] LD_PRELOAD" \
+        "${ACCEL_PROF_HOME}/lib/libcompute_sanitizer.so" >> ${OUTPUT_REDIRECT}
+printf "%-30s: %s\n" "[ACCELPROF INFO] OPTIONS" \
+        "${OPTION_STR}" >> ${OUTPUT_REDIRECT}
+printf "%-30s: %s %s\n" "[ACCELPROF INFO] COMMAND" \
         "${EXECUTABLE}" "${ARGS}" >> ${OUTPUT_REDIRECT}
 
 # Record start time in seconds since epoch
 start_time=$(date +%s)
-printf "%-25s: %s\n\n" "[ACCELPROF INFO] START TIME" "$(date)" >> ${OUTPUT_REDIRECT}
+printf "%-30s: %s\n\n" "[ACCELPROF INFO] START TIME" "$(date)" >> ${OUTPUT_REDIRECT}
 
 # accelprof
 
@@ -186,6 +197,6 @@ fi
 # Record end time and calculate elapsed time
 end_time=$(date +%s)
 elapsed=$((end_time - start_time))
-printf "%-25s: %s\n" "[ACCELPROF INFO] END TIME" "$(date)" >> ${OUTPUT_REDIRECT}
-printf "%-25s: %02d:%02d:%02d\n" "[ACCELPROF INFO] ELAPSED TIME" \
+printf "%-30s: %s\n" "[ACCELPROF INFO] END TIME" "$(date)" >> ${OUTPUT_REDIRECT}
+printf "%-30s: %02d:%02d:%02d\n" "[ACCELPROF INFO] ELAPSED TIME" \
         $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60)) >> ${OUTPUT_REDIRECT}
