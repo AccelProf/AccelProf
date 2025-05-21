@@ -15,10 +15,12 @@ Usage:
     -h, --help
         Print this help message.
     -t <tool_name>
+        none: Do nothing.
         mem_trace: Trace memory access of CUDA kernels.
         app_metric: Collect metrics for CUDA Applications.
         code_check: Check CUDA code for potential issues.
         hot_analysis: Analyze hot memory regions.
+        app_analysis: Analyze CUDA application performance.
     -d <device_name>
         Specify the device vendor name.
         Valid values:
@@ -145,6 +147,9 @@ then
 elif [ ${TOOL} == "app_analysis_cpu" ]
 then
     export YOSEMITE_TOOL_NAME=app_analysis_cpu
+elif [ ${TOOL} == "none" ]
+then
+    export YOSEMITE_TOOL_NAME=none
 else
     error_hint "Invalid tool name."
 fi
@@ -183,6 +188,12 @@ then
     LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/libnv-nvbit.so
 else
     LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/libcompute_sanitizer.so
+fi
+
+# run the application without any tool
+if [ ${YOSEMITE_TOOL_NAME} == "none" ]
+then
+    LD_PRELOAD_LIB=""
 fi
 
 LD_PRELOAD=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
