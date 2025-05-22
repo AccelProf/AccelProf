@@ -94,7 +94,7 @@ if [ ! -z ${RESULT_DIR} ]
 then
     echo "Result directory: ${RESULT_DIR}"
 else
-    export RESULT_DIR=.
+    export RESULT_DIR=$(pwd)
 fi
 
 if [ "${DEVICE}" = "nvc" ]; then
@@ -200,7 +200,8 @@ LD_PRELOAD=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
 
 # check if the above execution is successful
 if [ $? -ne 0 ]; then
-    echo "error: Fail to run the application with AccelProf. Please check ${OUTPUT_REDIRECT} for more details."
+    echo "error: Fail to run the application with AccelProf."
+    echo "Please check ${OUTPUT_REDIRECT} for more details."
     echo ""
     exit 1
 fi
