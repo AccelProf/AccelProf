@@ -21,6 +21,9 @@ Usage:
         code_check: Check CUDA code for potential issues.
         hot_analysis: Analyze hot memory regions.
         app_analysis: Analyze CUDA application performance.
+        app_analysis_cpu: Analyze CUDA application performance on CPU.
+        time_hotness_cpu: Analyze time hotness on CPU.
+        uvm_advisor: Analyze UVM memory access patterns.
     -d <device_name>
         Specify the device vendor name.
         Valid values:
@@ -147,6 +150,9 @@ then
 elif [ ${TOOL} == "app_analysis_cpu" ]
 then
     export YOSEMITE_TOOL_NAME=app_analysis_cpu
+elif [ ${TOOL} == "time_hotness_cpu" ]
+then
+    export YOSEMITE_TOOL_NAME=time_hotness_cpu
 elif [ ${TOOL} == "none" ]
 then
     export YOSEMITE_TOOL_NAME=none
