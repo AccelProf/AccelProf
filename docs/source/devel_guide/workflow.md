@@ -17,7 +17,7 @@ Each component plays a distinct role in the profiling pipeline, enabling clean s
 The target workload can be:
 
 - A deep learning model executed via a framework such as **PyTorch**
-- A binary GPU-accelerated application using libraries like **cuDNN** or **MIOpen**
+- A binary GPU-accelerated application using libraries like **cuDNN**
 
 This application is the source of events captured during runtime.
 
