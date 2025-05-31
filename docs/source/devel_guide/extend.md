@@ -1,37 +1,50 @@
-# How to Extend?
+# How to Extend AccelProf
 
+AccelProf is designed to be extensible. Developers can create custom analysis tools by building on top of the core profiling infrastructure provided by PASTA. This guide walks through how to add a new tool, reuse the tool template, and implement analysis logic.
 
-## Add new tool support
+---
 
-In `sanalyzer/include/tools/tool_type.h`, add new tool name.
+## 1. Add New Tool Support
 
-```C++
-// Add new tool name in the following enum.
+Start by registering your new tool in the tool enumeration definition. This enables the framework to recognize and activate the tool via command-line options.
+
+### Modify the Tool Type Enum
+
+Edit `sanalyzer/include/tools/tool_type.h` and add your new tool name to the `AnalysisTool_t` enum:
+
+```cpp
 typedef enum {
     CODE_CHECK = 0,
     APP_METRICE = 1,
     MEM_TRACE = 2,
     HOT_ANALYSIS = 3,
     UVM_ADVISOR = 4,
-    TOOL_NUMS = 5
+    TOOL_NUMS = 5  // Update TOOL_NUMS if you add more entries
 } AnalysisTool_t;
-
 ```
 
-## Reuse tool template for customized analysis
+> 🔧 You should also define a corresponding enum entry in any internal tool dispatch or configuration files used in the runtime.
 
-To develop a new tool to do customized analysis on PASTA. Developer can choose to inherit the base `class Tool` to do customized analysis. Within the tool template, developer can collect the needed runtime information based on their own needs. Developer collect these runtime information by implementing the (subset of) interfaces provided by PASTA.
+---
 
-```C++
+## 2. Reuse Tool Template for Custom Analysis
+
+AccelProf provides a base class `Tool` for implementing analysis logic. To create a new tool, inherit from this class and implement the relevant interface functions based on your analysis goals.
+
+### Create a Custom Tool Class
+
+Here is a minimal skeleton:
+
+```cpp
 class CustomTool final : public Tool {
 public:
     CustomTool() : Tool(CUSTOM_ANALYSIS) {
         init();
     }
 
-    void init();
-
     ~CustomTool() {}
+
+    void init();
 
     void evt_callback(EventPtr_t evt);
 
@@ -41,78 +54,87 @@ public:
 
     void flush();
 };
-
 ```
 
-## Add analysis code
+This structure allows you to hook into the runtime event stream and analyze various types of memory and execution events.
 
-After declaring the class, developer can add analysis code. User can choose all or some of the following analysis, or the combination of the following analysis, feeding their own performance analysis needs.
+---
 
-```C++
+## 3. Add Custom Analysis Code
+
+After declaring your tool class, implement its methods to perform desired runtime analysis. You may implement any combination of the following callbacks depending on your needs.
+
+### Example Callback Implementations
+
+```cpp
 void CustomTool::evt_callback(EventPtr_t evt) {
-    // handle different events
+    // Dispatch to specific event type handlers
 }
-
 
 void CustomTool::kernel_start_callback(std::shared_ptr<KernelLauch_t> kernel) {
-    // kernel analysis
+    // Perform kernel launch analysis
 }
 
-void CustomTool::kernel_end_callback(std::shared_ptr<KernelLauch_t> kernel) {
-    // kernel analysis
+void CustomTool::kernel_end_callback(std::shared_ptr<KernelEnd_t> kernel) {
+    // Perform kernel end analysis
 }
 
 void CustomTool::mem_alloc_callback(std::shared_ptr<MemAlloc_t> mem) {
-    // allocation analysis
+    // Analyze memory allocation
 }
-
 
 void CustomTool::mem_free_callback(std::shared_ptr<MemFree_t> mem) {
-    // reclaimation analysis
+    // Analyze memory deallocation
 }
-
-
 
 void CustomTool::mem_cpy_callback(std::shared_ptr<MemCpy_t> mem) {
-    // memory transfer analysis
+    // Track memory copy operations
 }
-
 
 void CustomTool::mem_set_callback(std::shared_ptr<MemSet_t> mem) {
-    // memory set analysis
+    // Analyze memory initialization
 }
-
 
 void CustomTool::ten_alloc_callback(std::shared_ptr<TenAlloc_t> ten) {
-    // tensor analysis
+    // Analyze tensor allocation
 }
-
 
 void CustomTool::ten_free_callback(std::shared_ptr<TenFree_t> ten) {
-    // tensor analysis
+    // Analyze tensor deallocation
 }
-
 
 void CustomTool::op_start_callback(std::shared_ptr<OpStart_t> op) {
-    // op analysis
+    // Analyze start of a framework-level op
 }
 
-void CustomTool::op_end_callback(std::shared_ptr<OpStart_t> op) {
-    // op analysis
+void CustomTool::op_end_callback(std::shared_ptr<OpEnd_t> op) {
+    // Analyze end of a framework-level op
 }
 
 void CustomTool::gpu_data_analysis(void* data, uint64_t size) {
-    // memory access analysis
+    // GPU-accessible memory access analysis
 }
-
 
 void CustomTool::query_ranges(void* ranges, uint32_t limit, uint32_t* count) {
-    // check memory boundary
+    // Report memory range metadata
 }
-
 
 void CustomTool::flush() {
-    // called at the end of the program
-    // dump the analysis result
+    // Finalize and dump results at program exit
 }
 ```
+
+> 🧠 You can leave unused methods empty or omit them entirely—AccelProf only calls the functions your tool overrides.
+
+---
+
+## Summary
+
+Extending AccelProf with a new tool involves:
+
+1. Declaring the tool in the appropriate header files.
+2. Implementing a subclass of the `Tool` base class.
+3. Registering and wiring the tool into the build and runtime system.
+4. Writing custom analysis logic for the events you're interested in.
+
+AccelProf's modular design makes it easy to experiment with new profiling strategies tailored to your research or application needs.

@@ -1,35 +1,43 @@
 # Overview
 
-AccelProf is a modular, extensible, and low-overhead framework for performance analysis across heterogeneous accelerators (e.g., NVIDIA GPUs, AMD GPUs). It provides unified profiling support for both low-level hardware events and high-level deep learning (DL) framework events, enabling comprehensive workload analysis.
+**AccelProf** is a modular, extensible, and low-overhead framework for performance analysis on heterogeneous accelerators such as **NVIDIA** and **AMD GPUs**. It offers a unified profiling interface that bridges low-level hardware event tracing with high-level deep learning (DL) framework insights, making it an effective tool for analyzing modern workloads.
 
+---
 
 ![Architecture](../../assets/design.png)
+
 <div style="text-align: center">
   <p><b>Figure 1:</b> Architecture of the PASTA Framework.</p>
 </div>
 
 
-PASTA is composed of three decoupled components: the event handler, which interfaces with low-level profiling APIs and deep learning frameworks; the Processor, which performs pre-processing (either on CPU or GPU) and dispatches data; and the Tool Collection, which hosts user-defined analysis tools. This modular design enables extensibility and cross-vendor compatibility, allowing PASTA to support a wide range of workloads across NVIDIA and AMD platforms.
+AccelProf is built on top of the **PASTA** (Program AnalysiS Tool Architecture) framework, which is composed of three core, decoupled components:
 
+- **Event Handler**: Interfaces with vendor-specific profiling APIs and DL framework callbacks to collect runtime data.
+- **Processor**: Performs pre-processing of collected data—either on the CPU or GPU—and routes it to analysis modules.
+- **Tool Collection**: Hosts a variety of user-defined analysis tools that implement specific profiling features.
+
+This clean separation of responsibilities supports easy extension, flexible integration, and compatibility across vendors and platforms.
+
+---
 
 ## Key Features
 
-* Modular design with independent hander/processor/tool layers
+- ✅ **Modular architecture** separating handler, processor, and tool logic
+- 🔄 **Cross-vendor support** for NVIDIA and AMD accelerators
+- 🧠 **Deep learning framework integration**, currently supporting PyTorch
+- ⚡ **GPU-accelerated in-situ preprocessing** (optional but highly efficient)
+- 🎯 **Fine-grained instrumentation** using annotation APIs (e.g., `start()`/`end()` wrappers)
 
-* Cross-vendor support (NVIDIA, AMD)
+---
 
-* DL framework integration (PyTorch)
+## Typical Use Cases
 
-* Optional GPU-accelerated in-situ preprocessing
+AccelProf is suited for a wide range of performance analysis scenarios, including:
 
-* Easy range-specific instrumentation using annotations
+- 🔍 **Kernel frequency profiling** to identify performance-critical code regions
+- 🚀 **UVM memory optimization** through fine-grained access pattern analysis
+- 🧩 **Operator-level DL analysis** to capture tensor allocations, operations, and kernel execution
+- 📊 **Custom tool development** for research or production use
 
-## Typical use cases
-
-* Kernel frequency profiling
-
-* UVM memory access optimization
-
-* DL operator-level performance analysis
-
-* And more...
+Whether you're debugging memory bottlenecks, tuning kernel launches, or analyzing large DL models, AccelProf provides a flexible platform to support your goals.

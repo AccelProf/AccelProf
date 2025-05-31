@@ -1,38 +1,39 @@
-# Usage
+# Usage Guide for AccelProf
+
+AccelProf is a flexible command-line tool designed for profiling GPU applications. It supports a variety of tools to collect metrics, trace memory, and analyze deep learning workloads.
+
+---
 
 ## Basic Usage
 
-AccelProf is a command-line tool. Users can use it to perform program analysis with pre-defined or user-defined tools.
+AccelProf can be invoked directly from the terminal to analyze an application using pre-built or custom tools.
 
-### Command Line
+### Command Syntax
 
-```shell
-accelprof -v -t app_analysis {executable} {executable args}
+```bash
+accelprof -v -t app_analysis {executable} {executable arguments}
 ```
 
-### Profile `vectoradd` Example
+### Example: Profiling `vectoradd`
 
-#### Profile the `vectoradd`
+Run the `vectoradd` example using the `app_metric` tool:
 
-```shell
+```bash
 accelprof -v -t app_metric ./vectoradd
 ```
 
-#### Outputs:
+#### Output Files
 
-1. Profiling log file `vectoradd.accelprof.log`:
+1. **Profiling Log: `vectoradd.accelprof.log`**
 
-```shell
+This file logs the profiling session metadata and runtime activity:
+
+```text
 [ACCELPROF INFO] VERSION      : c6d15f78b30385ba30ee64ab47db1b9b4729d16c, modified 0
 [ACCELPROF INFO] LD_PRELOAD   : /home/mao/AccelProf/lib/libcompute_sanitizer.so
 [ACCELPROF INFO] OPTIONS      :  -v -t app_metric
 [ACCELPROF INFO] COMMAND      : ./vectoradd 
 [ACCELPROF INFO] START TIME   : Fri May 30 04:47:08 PM PDT 2025
-
-[SANITIZER INFO] Enabling app_metric tool.
-================================================================================
-[SANITIZER INFO] Context 0x7ffd21f315a0 creation starting on device 0x7ffd21f315a8
-[SANITIZER INFO] Stream 0x7ffd21f314a8 created on context 0x7ffd21f314a0
 ...
 [SANITIZER INFO] Free memory 0x7fb4e9400000 with size 800000 (flag: 0)
 Dumping traces to vectoradd_2025-05-30_16-47-09.log
@@ -40,12 +41,13 @@ Dumping traces to vectoradd_2025-05-30_16-47-09.log
 [ACCELPROF INFO] ELAPSED TIME : 00:00:01
 ```
 
-2. Result file `vectoradd_xxxx.log`:
+2. **Analysis Results: `vectoradd_xxxx.log`**
 
-```shell
+This file contains key memory and kernel statistics:
+
+```text
 Alloc(0) 0:	140414982029312 800000 (781.25 KB)
 Alloc(0) 1:	140414982829568 800000 (781.25 KB)
-Alloc(0) 2:	140414984126464 800000 (781.25 KB)
 ...
 Maximum memory accesses kernel: vecAdd(double*, double*, double*, int) (Kernel ID: 0)
 Maximum memory accesses per kernel: 300000 (300.00 K)
@@ -54,17 +56,19 @@ Total memory accesses: 600000 (600.00 K)
 Average accesses per page: 1024
 ```
 
+---
+
 ## Advanced Usage
 
-This subsection shows more command-line options.
+To explore all command-line options supported by AccelProf, run:
 
-```shell
-$ accelprof -h
+```bash
+accelprof -h
 ```
 
-### Output:
+### Help Output
 
-```shell
+```text
 Description: A collection of CUDA application profilers.
 Usage:
     -h, --help
@@ -89,57 +93,72 @@ Usage:
         Verbose mode.
 ```
 
-### Use Different Tools
+---
 
-#### Collect metrics for CUDA Applications
+## Use Different Tools
 
-```shell
+AccelProf supports multiple profiling modes:
+
+### Metrics Collection
+
+```bash
 accelprof -v -t app_metric ./vectoradd
 ```
 
-#### Analyze hot memory regions
+### Hot Memory Region Analysis
 
-```shell
+```bash
 accelprof -v -t hot_analysis ./vectoradd
 ```
 
-#### Analyze CUDA application performance
+### Application Performance Analysis
 
-```shell
+```bash
 accelprof -v -t app_analysis ./vectoradd
 ```
 
-### Use Different Backends/Vendors
+---
 
-#### NVIDIA Compute Sanitizer API (default)
+## Use Different Backends/Vendors
 
-```shell
+AccelProf can use various vendor APIs as profiling backends:
+
+### NVIDIA Compute Sanitizer (Default)
+
+```bash
 accelprof -v -t app_analysis ./vectoradd
 ```
 
-#### NVIDIA NVBit API
+### NVIDIA NVBit
 
-```shell
+```bash
 accelprof -v -d nvbit -t app_analysis ./vectoradd
 ```
 
-#### AMD ROCProfiler SDK
+### AMD ROCProfiler
 
-```shell
+```bash
 accelprof -v -d rocm -t app_analysis ./vectoradd
 ```
 
-### Customized Range Inspection
+---
 
-AccelProf allows users to inspect only a subset of the application by using lightweight APIs provided by AccelProf.
+## Customized Range Inspection
 
-#### Example User Code `test.py`:
+AccelProf allows fine-grained instrumentation by letting users specify code regions to analyze using lightweight Python APIs.
+
+### Example: `test.py`
 
 ```python
 import accelprof
 
 accelprof.start()
-# target analysis code
+# Insert target analysis code here
 accelprof.end()
 ```
 
+Use this pattern to isolate specific function calls, training loops, or inference paths for analysis.
+
+---
+
+This flexible usage model enables both high-level and low-level insight into application behavior across platforms.
