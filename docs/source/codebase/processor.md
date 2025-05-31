@@ -2,8 +2,8 @@
 
 The **Event Processor** module serves as the intermediary stage that **preprocesses raw event data** collected by the Event Handler. It applies custom transformation and analysis routines using modular processor functions such as:
 
-- `PASTA::tensor_info_process`
-- `PASTA::kernel_info_process`
+- `AccelProf::tensor_info_process`
+- `AccelProf::kernel_info_process`
 
 This design supports both CPU- and GPU-based data preprocessing, allowing:
 

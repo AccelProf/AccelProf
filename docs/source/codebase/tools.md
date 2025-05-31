@@ -1,6 +1,6 @@
 # Tool Collection
 
-The **Tool Collection** module in PASTA executes user-defined analysis tasks after event data has been preprocessed. It provides:
+The **Tool Collection** module in AccelProf executes user-defined analysis tasks after event data has been preprocessed. It provides:
 
 - A library of prebuilt analysis tools (e.g., kernel frequency profiling, tensor-level summaries)
 - A clean interface for extending functionality via tool templates
