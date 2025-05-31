@@ -1,7 +1,7 @@
 
 Welcome to AccelProf's documentation!
 =======================================
-**AccelProf** is a lightweight modular performance analysis tool framework for accelerators.
+**AccelProf** is the implementation of **PASTA**, a modular Performance AnalysiS Tool framework for Accelerators.
 
 **AccelProf** is open-sourced on `GitHub <https://github.com/AccelProf>`_.
 
@@ -32,14 +32,14 @@ Welcome to AccelProf's documentation!
    :maxdepth: 2
    :caption: Codebase
 
-   codebase/backend
-   codebase/frontend
+   codebase/handler
+   codebase/processor
    codebase/tools
    codebase/utils
 
 
 .. toctree::
    :maxdepth: 2
-   :caption: Samples
+   :caption: Benchmarks
 
-   samples/unit
+   benchmarks/samples

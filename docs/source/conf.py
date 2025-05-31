@@ -4,7 +4,7 @@
 
 project = 'AccelProf'
 copyright = '2025'
-author = 'Mao Lin'
+author = ''
 
 release = '0.1'
 version = '0.1.0'

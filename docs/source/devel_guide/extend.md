@@ -18,9 +18,9 @@ typedef enum {
 
 ```
 
-## Inhert new tool class for customized analysis
+## Reuse tool template for customized analysis
 
-To develop a new tool to do customized analysis on PASTA. Developer can choose to inherent the base `class Tool` to do customized analysis. Within the new tool class, developer can collect the needed runtime information based on their own needs. Developer collect these runtime information by implementing the (subset of) interfaces provided by PASTA.
+To develop a new tool to do customized analysis on PASTA. Developer can choose to inherit the base `class Tool` to do customized analysis. Within the tool template, developer can collect the needed runtime information based on their own needs. Developer collect these runtime information by implementing the (subset of) interfaces provided by PASTA.
 
 ```C++
 class CustomTool final : public Tool {
