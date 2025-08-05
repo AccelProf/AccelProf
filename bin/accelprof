@@ -30,7 +30,7 @@ Usage:
         Valid values:
             - nvc (NVIDIA Compute Sanitizer, default)
             - nvbit (NVIDIA nvbit)
-            - rocm (AMD)
+            - rocm (AMD ROCm)
     -v
         Verbose mode.
 EOF
@@ -196,6 +196,9 @@ then
 elif [ ${YOSEMITE_DEVICE} == "nvbit" ]
 then
     LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/libnv-nvbit.so
+elif [ ${YOSEMITE_DEVICE} == "rocm" ]
+then
+    LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/librocm_callback.so
 else
     LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/libcompute_sanitizer.so
 fi
