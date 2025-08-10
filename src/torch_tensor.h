@@ -14,10 +14,10 @@ public:
                                   tensor_callback_t callback_ptr);
 
     void tensor_malloc_callback(void* ptr, int64_t alloc_size, int64_t total_allocated,
-                                int64_t total_reserved);
+                                int64_t total_reserved, int device_id);
 
     void tensor_free_callback(void* ptr, int64_t alloc_size, int64_t total_allocated,
-                                int64_t total_reserved);
+                                int64_t total_reserved, int device_id);
 
     static TorchTensor& getInstance();
 

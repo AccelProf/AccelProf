@@ -15,7 +15,7 @@ typedef enum {
 
 // TORCH_SCOPE_TENSOR_MALLOC, TORCH_SCOPE_TENSOR_FREE
 typedef void (*tensor_callback_t)(uint64_t ptr, int64_t alloc_size,
-                        int64_t total_allocated, int64_t total_reserved);
+                        int64_t total_allocated, int64_t total_reserved, int device_id);
 
 // TORCH_SCOPE_OPERATOR_START, TORCH_SCOPE_OPERATOR_END
 typedef void (*operator_callback_t)(void* ctx, std::string op_name);
