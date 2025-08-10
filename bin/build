@@ -24,12 +24,14 @@ mkdir -p $ACCEL_PROF_DIR/lib
 mkdir -p $ACCEL_PROF_DIR/build
 
 # define build knobs
-ENABLE_COMPUTE_SANALYZER=0
-ENABLE_NVBIT_TOOL=0
-ENABLE_AMD_ROCM=0
+: "${ENABLE_COMPUTE_SANALYZER_BACKEND:=0}"
+: "${ENABLE_NVBIT_BACKEND:=0}"
+: "${ENABLE_AMD_ROCM_BACKEND:=0}"
+: "${ENABLE_TORCH_MONITOR_BACKEND:=0}"
+
 
 # check build env
-if [ $ENABLE_COMPUTE_SANALYZER -eq 1 ] || [ $ENABLE_NVBIT_TOOL -eq 1 ]; then
+if [ $ENABLE_TORCH_MONITOR_BACKEND -eq 1 ]; then
     source ${ACCEL_PROF_DIR}/bin/utils/check_build_env.sh
 fi
 
@@ -58,14 +60,14 @@ make -j install DEBUG=$DEBUG SANITIZER_TOOL_DIR=$ACCEL_PROF_DIR/nv-compute \
                              INSTALL_DIR=$ACCEL_PROF_DIR/build/sanalyzer
 
 # build tensor_scope
-if [ $ENABLE_COMPUTE_SANALYZER -eq 1 ] || [ $ENABLE_NVBIT_TOOL -eq 1 ]; then
+if [ $ENABLE_TORCH_MONITOR_BACKEND -eq 1 ]; then
     cd $ACCEL_PROF_DIR/tensor_scope
     make -j install DEBUG=$DEBUG INSTALL_DIR=$ACCEL_PROF_DIR/build/tensor_scope
 fi
 
 
 # build nv-compute
-if [ $ENABLE_COMPUTE_SANALYZER -eq 1 ]; then
+if [ $ENABLE_COMPUTE_SANALYZER_BACKEND -eq 1 ]; then
     cd $ACCEL_PROF_DIR/nv-compute
     make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer \
                          TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope \
@@ -76,7 +78,7 @@ fi
 
 
 # build nv-nvbit
-if [ $ENABLE_NVBIT_TOOL -eq 1 ]; then
+if [ $ENABLE_NVBIT_BACKEND -eq 1 ]; then
     cd $ACCEL_PROF_DIR/nv-nvbit
     make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer \
                          TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope
@@ -86,7 +88,7 @@ fi
 
 
 # build amd-rocm (Requires AMD ROCm development environment)
-if [ $ENABLE_AMD_ROCM -eq 1 ]; then
+if [ $ENABLE_AMD_ROCM_BACKEND -eq 1 ]; then
     cd $ACCEL_PROF_DIR/amd-rocm
     make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer
 

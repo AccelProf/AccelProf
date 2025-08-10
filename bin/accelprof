@@ -25,6 +25,7 @@ Usage:
         time_hotness_cpu: Analyze time hotness on CPU.
         uvm_advisor: Analyze UVM memory access patterns.
         event_trace: Trace AMD GPU events.
+        event_trace_mgpu: Trace multi-GPU events.
     -d <device_name>
         Specify the device vendor name.
         Valid values:
@@ -157,6 +158,9 @@ then
 elif [ ${TOOL} == "event_trace" ]
 then
     export YOSEMITE_TOOL_NAME=event_trace
+elif [ ${TOOL} == "event_trace_mgpu" ]
+then
+    export YOSEMITE_TOOL_NAME=event_trace_mgpu
 elif [ ${TOOL} == "none" ]
 then
     export YOSEMITE_TOOL_NAME=none
