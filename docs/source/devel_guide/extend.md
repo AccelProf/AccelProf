@@ -71,7 +71,7 @@ void CustomTool::evt_callback(EventPtr_t evt) {
     // Dispatch to specific event type handlers
 }
 
-void CustomTool::kernel_start_callback(std::shared_ptr<KernelLauch_t> kernel) {
+void CustomTool::kernel_start_callback(std::shared_ptr<KernelLaunch_t> kernel) {
     // Perform kernel launch analysis
 }
 
