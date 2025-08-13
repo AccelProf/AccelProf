@@ -26,6 +26,15 @@ INCLUDES += -I$(TORCH_DIR)/include -I$(TORCH_DIR)/include/torch/csrc/api/include
 LDFLAGS += -L$(TORCH_DIR)/lib -Wl,-rpath=$(TORCH_DIR)/lib
 LINK_LIBS += -lc10 -ltorch -ltorch_cpu
 
+# --- Add CUDA (or HIP) component if present
+# Try torch_cuda first; if not found, try torch_hip (ROCm)
+ifneq ("$(wildcard $(TORCH_DIR)/lib/libtorch_cuda.so)","")
+  LINK_LIBS += -ltorch_cuda -lc10_cuda
+endif
+ifneq ("$(wildcard $(TORCH_DIR)/lib/libtorch_hip.so)","")
+  LINK_LIBS += -ltorch_hip
+endif
+
 PYTHON_INCLUDE_DIR = $(shell python3 -c "import sysconfig; print(sysconfig.get_path('include'))")
 PYTHON_LIB_DIR = $(shell python3 -c "import sysconfig; print(sysconfig.get_path('stdlib'))")
 PYTHON_VERSION = $(shell python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
