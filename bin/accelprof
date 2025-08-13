@@ -213,7 +213,15 @@ then
     LD_PRELOAD_LIB=""
 fi
 
-LD_PRELOAD=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
+# Multi-GPU profiling (e.g., distributed training with Megatron-LM)
+if [ "${MGPU_PROFILING}" == "1" ]
+then
+    export TORCH_PROFILE_ENABLED=1
+    CUDA_INJECTION64_PATH=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
+else
+    LD_PRELOAD=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
+fi
+
 
 # check if the above execution is successful
 if [ $? -ne 0 ]; then
