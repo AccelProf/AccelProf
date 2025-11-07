@@ -1,0 +1,6 @@
+#!/bin/bash
+
+ACCEL_PROF_DIR=$(pwd)
+
+cd ${ACCEL_PROF_DIR}
+git clone https://github.com/Lin-Mao/cgo26-ae.git

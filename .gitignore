@@ -7,3 +7,5 @@ test/
 lib/
 obj/
 build/
+
+cgo26-ae/
