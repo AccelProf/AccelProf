@@ -3,6 +3,7 @@
 #include "backend/nvbit_app_metric.h"
 #include "backend/nvbit_mem_trace.h"
 #include "backend/nvbit_app_analysis.h"
+#include "backend/nvbit_roofline_flops.h"
 #include "torch_scope.h"
 
 /* every tool needs to include this once */
@@ -71,6 +72,8 @@ void nvbit_at_init() {
         yosemite_mem_trace::mem_trace_nvbit_at_init();
     } else if (nvbit_options.patch_name == GPU_PATCH_APP_ANALYSIS_NVBIT) {
         yosemite_app_analysis::app_analysis_nvbit_at_init();
+    } else if (nvbit_options.patch_name == GPU_PATCH_ROOFLINE_FLOPS_NVBIT) {
+        yosemite_roofline_flops::roofline_flops_nvbit_at_init();
     }
 }
 
@@ -81,6 +84,8 @@ void nvbit_tool_init(CUcontext ctx) {
         yosemite_mem_trace::mem_trace_nvbit_tool_init(ctx);
     } else if (nvbit_options.patch_name == GPU_PATCH_APP_ANALYSIS_NVBIT) {
         yosemite_app_analysis::app_analysis_nvbit_tool_init(ctx);
+    } else if (nvbit_options.patch_name == GPU_PATCH_ROOFLINE_FLOPS_NVBIT) {
+        yosemite_roofline_flops::roofline_flops_nvbit_tool_init(ctx);
     }
 }
 
@@ -91,6 +96,8 @@ void nvbit_at_ctx_init(CUcontext ctx) {
         yosemite_mem_trace::mem_trace_nvbit_at_ctx_init(ctx);
     } else if (nvbit_options.patch_name == GPU_PATCH_APP_ANALYSIS_NVBIT) {
         yosemite_app_analysis::app_analysis_nvbit_at_ctx_init(ctx);
+    } else if (nvbit_options.patch_name == GPU_PATCH_ROOFLINE_FLOPS_NVBIT) {
+        yosemite_roofline_flops::roofline_flops_nvbit_at_ctx_init(ctx);
     }
 }
 
@@ -101,6 +108,8 @@ void nvbit_at_ctx_term(CUcontext ctx) {
         yosemite_mem_trace::mem_trace_nvbit_at_ctx_term(ctx);
     } else if (nvbit_options.patch_name == GPU_PATCH_APP_ANALYSIS_NVBIT) {
         yosemite_app_analysis::app_analysis_nvbit_at_ctx_term(ctx);
+    } else if (nvbit_options.patch_name == GPU_PATCH_ROOFLINE_FLOPS_NVBIT) {
+        yosemite_roofline_flops::roofline_flops_nvbit_at_ctx_term(ctx);
     }
 }
 
@@ -120,6 +129,8 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
         yosemite_mem_trace::mem_trace_nvbit_at_cuda_event(ctx, is_exit, cbid, name, params, pStatus);
     } else if (nvbit_options.patch_name == GPU_PATCH_APP_ANALYSIS_NVBIT) {
         yosemite_app_analysis::app_analysis_nvbit_at_cuda_event(ctx, is_exit, cbid, name, params, pStatus);
+    } else if (nvbit_options.patch_name == GPU_PATCH_ROOFLINE_FLOPS_NVBIT) {
+        yosemite_roofline_flops::roofline_flops_nvbit_at_cuda_event(ctx, is_exit, cbid, name, params, pStatus);
     }
 
 }
@@ -131,5 +142,7 @@ void nvbit_at_term() {
         yosemite_mem_trace::mem_trace_nvbit_at_term();
     } else if (nvbit_options.patch_name == GPU_PATCH_APP_ANALYSIS_NVBIT) {
         yosemite_app_analysis::app_analysis_nvbit_at_term();
+    } else if (nvbit_options.patch_name == GPU_PATCH_ROOFLINE_FLOPS_NVBIT) {
+        yosemite_roofline_flops::roofline_flops_nvbit_at_term();
     }
 }
