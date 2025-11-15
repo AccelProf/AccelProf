@@ -140,6 +140,15 @@ then
 elif [ ${TOOL} == "app_metric" ]
 then
     export YOSEMITE_TOOL_NAME=app_metric
+elif [ ${TOOL} == "roofline_flops" ]
+then
+    export YOSEMITE_TOOL_NAME=roofline_flops
+elif [ ${TOOL} == "roofline_size" ]
+then
+    export YOSEMITE_TOOL_NAME=roofline_size
+elif [ ${TOOL} == "roofline_time" ]
+then
+    export YOSEMITE_TOOL_NAME=roofline_time
 elif [ ${TOOL} == "hot_analysis" ]
 then
     export YOSEMITE_TOOL_NAME=hot_analysis
