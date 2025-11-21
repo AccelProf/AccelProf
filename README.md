@@ -17,13 +17,17 @@ A Modular Program Analysis Tool Framework for Emerging Accelerators.
 ## Installation
 
 ```bash
+# Download
 git clone --recursive https://github.com/AccelProf/AccelProf.git
-cd AccelProf
 git submodule update --init --recursive
 
+# Check dependences
 bash ./bin/utils/check_build_env.sh
+
+# Build and install
 ./bin/build
 
+# Set env
 export ACCEL_PROF_HOME=$(pwd)
 export PATH=${ACCEL_PROF_HOME}/bin:${PATH}
 ```
