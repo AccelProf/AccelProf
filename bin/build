@@ -93,4 +93,8 @@ if [ $ENABLE_AMD_ROCM_BACKEND -eq 1 ]; then
     make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer
 
     cp $ACCEL_PROF_DIR/amd-rocm/build/lib/*.so $ACCEL_PROF_DIR/lib/
+
+    cd $ACCEL_PROF_DIR/amd-rocm/torch
+    make -j
+    mv $ACCEL_PROF_DIR/amd-rocm/torch/*.so $ACCEL_PROF_DIR/lib/
 fi
