@@ -218,6 +218,11 @@ then
     LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/libamd_rocm_torch.so
 fi
 
+if [ ${YOSEMITE_TOOL_NAME} == "event_trace_mgpu" ]
+then
+    LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/libmgpu_torch.so
+fi
+
 # Multi-GPU profiling (e.g., distributed training with Megatron-LM)
 if [ "${MGPU_PROFILING}" == "1" ]
 then

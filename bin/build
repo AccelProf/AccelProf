@@ -74,6 +74,10 @@ make -j install DEBUG=$DEBUG SANITIZER_TOOL_DIR=$ACCEL_PROF_DIR/nv-compute \
 if [ "$ENABLE_TORCH_MONITOR_BACKEND" -eq 1 ]; then
     cd $ACCEL_PROF_DIR/tensor_scope
     make -j install DEBUG=$DEBUG INSTALL_DIR=$ACCEL_PROF_DIR/build/tensor_scope
+
+    cd $ACCEL_PROF_DIR/tensor_scope/torch
+    make -j
+    mv $ACCEL_PROF_DIR/tensor_scope/torch/*.so $ACCEL_PROF_DIR/lib/
 fi
 
 
