@@ -29,9 +29,20 @@ mkdir -p $ACCEL_PROF_DIR/build
 : "${ENABLE_AMD_ROCM_BACKEND:=0}"
 : "${ENABLE_TORCH_MONITOR_BACKEND:=0}"
 
+# Sanitize build knobs to ensure they are numeric (0 or 1)
+# Remove any non-numeric characters and default to 0 if empty
+ENABLE_COMPUTE_SANALYZER_BACKEND=$(echo "$ENABLE_COMPUTE_SANALYZER_BACKEND" | tr -d -c '0-9')
+ENABLE_COMPUTE_SANALYZER_BACKEND=${ENABLE_COMPUTE_SANALYZER_BACKEND:-0}
+ENABLE_NVBIT_BACKEND=$(echo "$ENABLE_NVBIT_BACKEND" | tr -d -c '0-9')
+ENABLE_NVBIT_BACKEND=${ENABLE_NVBIT_BACKEND:-0}
+ENABLE_AMD_ROCM_BACKEND=$(echo "$ENABLE_AMD_ROCM_BACKEND" | tr -d -c '0-9')
+ENABLE_AMD_ROCM_BACKEND=${ENABLE_AMD_ROCM_BACKEND:-0}
+ENABLE_TORCH_MONITOR_BACKEND=$(echo "$ENABLE_TORCH_MONITOR_BACKEND" | tr -d -c '0-9')
+ENABLE_TORCH_MONITOR_BACKEND=${ENABLE_TORCH_MONITOR_BACKEND:-0}
+
 
 # check build env
-if [ $ENABLE_TORCH_MONITOR_BACKEND -eq 1 ]; then
+if [ "$ENABLE_TORCH_MONITOR_BACKEND" -eq 1 ]; then
     source ${ACCEL_PROF_DIR}/bin/utils/check_build_env.sh
 fi
 
@@ -60,14 +71,14 @@ make -j install DEBUG=$DEBUG SANITIZER_TOOL_DIR=$ACCEL_PROF_DIR/nv-compute \
                              INSTALL_DIR=$ACCEL_PROF_DIR/build/sanalyzer
 
 # build tensor_scope
-if [ $ENABLE_TORCH_MONITOR_BACKEND -eq 1 ]; then
+if [ "$ENABLE_TORCH_MONITOR_BACKEND" -eq 1 ]; then
     cd $ACCEL_PROF_DIR/tensor_scope
     make -j install DEBUG=$DEBUG INSTALL_DIR=$ACCEL_PROF_DIR/build/tensor_scope
 fi
 
 
 # build nv-compute
-if [ $ENABLE_COMPUTE_SANALYZER_BACKEND -eq 1 ]; then
+if [ "$ENABLE_COMPUTE_SANALYZER_BACKEND" -eq 1 ]; then
     cd $ACCEL_PROF_DIR/nv-compute
     make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer \
                          TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope \
@@ -78,7 +89,7 @@ fi
 
 
 # build nv-nvbit
-if [ $ENABLE_NVBIT_BACKEND -eq 1 ]; then
+if [ "$ENABLE_NVBIT_BACKEND" -eq 1 ]; then
     cd $ACCEL_PROF_DIR/nv-nvbit
     make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer \
                          TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope
@@ -88,7 +99,7 @@ fi
 
 
 # build amd-rocm (Requires AMD ROCm development environment)
-if [ $ENABLE_AMD_ROCM_BACKEND -eq 1 ]; then
+if [ "$ENABLE_AMD_ROCM_BACKEND" -eq 1 ]; then
     cd $ACCEL_PROF_DIR/amd-rocm
     make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer
 
