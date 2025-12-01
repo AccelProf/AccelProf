@@ -47,7 +47,7 @@ Full user and developer documentation:
 
 ## Paper
 
-- **[CGO’26]** *PASTA: A Modular Program Analysis Tool Framework for Emerging Accelerators.*  
+- **[CGO’26]** *PASTA: A Modular Program Analysis Tool Framework for Accelerators.*  
   Mao Lin, Hyeran Jeon, and Keren Zhou.  
   Proceedings of the 23rd ACM/IEEE International Symposium on Code Generation and Optimization (CGO 2026).
 
