@@ -20,6 +20,8 @@ Usage:
         app_metric: Collect metrics for CUDA Applications.
         code_check: Check CUDA code for potential issues.
         hot_analysis: Analyze hot memory regions.
+        heatmap_analysis: Analyze heatmap of memory access.
+        block_divergence_analysis: Analyze block divergence of memory access.
         app_analysis: Analyze CUDA application performance.
         app_analysis_cpu: Analyze CUDA application performance on CPU.
         time_hotness_cpu: Analyze time hotness on CPU.
@@ -32,6 +34,10 @@ Usage:
             - nvc (NVIDIA Compute Sanitizer, default)
             - nvbit (NVIDIA nvbit)
             - rocm (AMD ROCm)
+    -b heatmap_analysis target block in x,y,z format.
+    -w kernel_whitelist_file
+        Specify the kernel whitelist file.
+            - Example: ./kernel_whitelist.txt (each line in the file is a kernel name)
     -v
         Verbose mode.
 EOF
@@ -73,6 +79,16 @@ do
         -h)
         help_func
         break
+        ;;
+        -b)
+        export TARGET_BLOCK=$1
+        shift
+        OPTION_STR="${OPTION_STR} -b ${TARGET_BLOCK}"
+        ;;
+        -w)
+        export KERNEL_WHITELIST_FILE=$1
+        shift
+        OPTION_STR="${OPTION_STR} -w ${KERNEL_WHITELIST_FILE}"
         ;;
         * )
         set -- "${arg}" "$@"
@@ -170,6 +186,19 @@ then
 elif [ ${TOOL} == "event_trace_mgpu" ]
 then
     export YOSEMITE_TOOL_NAME=event_trace_mgpu
+elif [ ${TOOL} == "heatmap_analysis" ]
+then
+    export YOSEMITE_TOOL_NAME=heatmap_analysis
+    if [ ! -z ${TARGET_BLOCK} ]
+    then
+        export YOSEMITE_TARGET_BLOCK=${TARGET_BLOCK}
+    fi
+elif [ ${TOOL} == "block_divergence_analysis" ]
+then
+    export YOSEMITE_TOOL_NAME=block_divergence_analysis
+elif [ ! -z ${KERNEL_WHITELIST_FILE} ]
+then
+    export YOSEMITE_KERNEL_WHITELIST=${KERNEL_WHITELIST_FILE}
 elif [ ${TOOL} == "none" ]
 then
     export YOSEMITE_TOOL_NAME=none

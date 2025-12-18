@@ -1,8 +1,10 @@
 *.fatbin
 *.so
+*.log
 run.sh
 
 .vscode/
+example/
 test/
 lib/
 obj/
