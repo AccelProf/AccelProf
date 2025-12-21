@@ -36,6 +36,12 @@ __device__ __forceinline__ int4 get_ctaid(void) {
     return ret;
 }
 
+__device__ __forceinline__ uint64_t get_ctaid_as_uint64(void) {
+    int4 ctaid = get_ctaid();
+    uint64_t ret = (uint64_t)(ctaid.x + ctaid.y * gridDim.x + ctaid.z * gridDim.x * gridDim.y);
+    return ret;
+}
+
 //  Get the number of CTA ids per grid
 __device__ __forceinline__ int4 get_nctaid(void) {
     int4 ret;

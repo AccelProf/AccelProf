@@ -23,6 +23,9 @@ struct MemoryAccess
     uint32_t accessSize;
     uint32_t flags;
     uint64_t warpId;
+    uint64_t ctaId;
+    uint64_t pc;
+    uint32_t active_mask;
     MemoryType type;
 
     // copy constructor
@@ -35,7 +38,10 @@ struct MemoryAccess
         accessSize = other.accessSize;
         flags = other.flags;
         warpId = other.warpId;
+        ctaId = other.ctaId;
         type = other.type;
+        pc = other.pc;
+        active_mask = other.active_mask;
     }
 
     MemoryAccess() = default;
@@ -86,6 +92,7 @@ struct MemoryAccessTracker
     uint32_t numEntries;
     uint64_t accessCount;
     uint64_t accessSize;
+    int32_t target_block[3]; // target block to sample [x, y, z]
     DoorBell* doorBell;
     MemoryAccess* access_buffer;
     MemoryAccessState* access_state;
