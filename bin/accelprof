@@ -22,6 +22,7 @@ Usage:
         hot_analysis: Analyze hot memory regions.
         heatmap_analysis: Analyze heatmap of memory access.
         block_divergence_analysis: Analyze block divergence of memory access.
+        pc_dependency_analysis: Analyze PC dependency of memory access.
         app_analysis: Analyze CUDA application performance.
         app_analysis_cpu: Analyze CUDA application performance on CPU.
         time_hotness_cpu: Analyze time hotness on CPU.
@@ -196,6 +197,9 @@ then
 elif [ ${TOOL} == "block_divergence_analysis" ]
 then
     export YOSEMITE_TOOL_NAME=block_divergence_analysis
+elif [ ${TOOL} == "pc_dependency_analysis" ]
+then
+    export YOSEMITE_TOOL_NAME=pc_dependency_analysis
 elif [ ! -z ${KERNEL_WHITELIST_FILE} ]
 then
     export YOSEMITE_KERNEL_WHITELIST=${KERNEL_WHITELIST_FILE}
