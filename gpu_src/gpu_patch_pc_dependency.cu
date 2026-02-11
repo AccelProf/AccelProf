@@ -50,6 +50,9 @@ SanitizerPatchResult CommonCallback(
     MemoryType type)
 {
     auto* pTracker = (MemoryAccessTracker*)userdata;
+    if (!pTracker->enabled_instrumenting) {
+        return SANITIZER_PATCH_SUCCESS;
+    }
 
     uint32_t active_mask = __activemask();
     uint32_t laneid = get_laneid();
@@ -57,12 +60,15 @@ SanitizerPatchResult CommonCallback(
 
     MemoryAccess* accesses = nullptr;
 
+    uint32_t distinct_sector_count = get_distint_sector_count((uint64_t)(uintptr_t)ptr/32, active_mask); // sector size is 32 bytes so we divide by 32 to get the sector tag
+
     if (laneid == first_laneid) {
         uint32_t idx = GetBufferIndex(pTracker);
         accesses = &pTracker->access_buffer[idx];
         accesses->accessSize = accessSize;
         accesses->flags = flags;
-        accesses->warpId = get_warpid();
+        accesses->distinct_sector_count = distinct_sector_count;
+        accesses->warpId = get_flat_thread_id() / GPU_WARP_SIZE;
         accesses->ctaId = get_ctaid_as_uint64();
         accesses->type = type;
         accesses->pc = pc - pTracker->kernel_pc; // for in-gpu pc offset calculation, so that the pc in corresponding analysis tool can be saved only in uint32_t
@@ -74,7 +80,7 @@ SanitizerPatchResult CommonCallback(
     accesses = (MemoryAccess*) shfl((uint64_t)accesses, first_laneid, active_mask);
     if (accesses) {
         if(type == MemoryType::Local){
-            accesses->addresses[laneid] = (((uint64_t) get_warpid() * GPU_WARP_SIZE + get_laneid()) << 54) |((uint64_t)(uintptr_t)ptr); // use high 10 bits to store thread id for local memory access
+            accesses->addresses[laneid] = ((get_flat_thread_id()) << 54) |((uint64_t)(uintptr_t)ptr); // use high 10 bits to store thread id for local memory access
         } else {
             accesses->addresses[laneid] = (uint64_t)(uintptr_t)ptr;
         }

@@ -62,7 +62,7 @@ static std::unordered_map<CUcontext, CUdevice> sanitizer_ctx_to_device;
 
 static std::unordered_set<std::string> sanitizer_kernel_white_list;
 
-// 读取 whitelist 文件，按行解析 kernel 关键字
+// read whitelist file, parse kernel keywords line by line
 void LoadKernelWhiteList(const char* whitelist_path) {
     if (!whitelist_path) return;
 
@@ -93,6 +93,9 @@ void LoadKernelWhiteList(const char* whitelist_path) {
 
     PRINT("[SANITIZER INFO] Loaded %zu kernel whitelist entries from %s\n",
           sanitizer_kernel_white_list.size(), whitelist_path);
+    if (!sanitizer_kernel_white_list.empty()) {
+        PRINT("[SANITIZER INFO] Kernel whitelist: %s\n", sanitizer_kernel_white_list.begin()->c_str());
+    }
 }
 
 bool SanitizerKernelWhiteListCheck(const std::string& functionName){
@@ -473,9 +476,11 @@ void LaunchBeginCallback(
 {
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
         // sampling
+        bool launch_monitoring = true;
         sanitizer_options.grid_launch_id++;
         if ((sanitizer_options.grid_launch_id % sanitizer_options.sample_rate == 0) &&
             SanitizerKernelWhiteListCheck(functionName)) {
+            
             PRINT("[SANITIZER INFO] Monitoring kernel %s, launch id %lu\n",
                     functionName.c_str(), sanitizer_options.grid_launch_id);
             auto it = sanitizer_active_modules.find(module);
@@ -486,12 +491,15 @@ void LaunchBeginCallback(
         } else {
             PRINT("[SANITIZER INFO] Skipping kernel %s monitoring, launch id %lu\n",
                     functionName.c_str(), sanitizer_options.grid_launch_id);
+            launch_monitoring = false;
             auto it = sanitizer_active_modules.find(module);
-            if (it->second) {
-                SANITIZER_SAFECALL(sanitizerUnpatchModule(module));
-                it->second = false;
+            if (it != sanitizer_active_modules.end()) {
+                if (it->second) {
+                    // SANITIZER_SAFECALL(sanitizerUnpatchModule(module));
+                    it->second = false;
+                }
+                return;
             }
-            return;
         }
 
         buffer_init(context);
@@ -660,6 +668,7 @@ void LaunchBeginCallback(
         }
 
         host_tracker_handle->kernel_pc = pc; // for in-gpu offset calculation
+        host_tracker_handle->enabled_instrumenting = launch_monitoring;
         SANITIZER_SAFECALL(
             sanitizerMemcpyHostToDeviceAsync(
                 device_tracker_handle, host_tracker_handle, sizeof(MemoryAccessTracker), hstream));
@@ -978,6 +987,12 @@ void ComputeSanitizerCallback(
                     auto* pContextData = (Sanitizer_ResourceContextData*)cbdata;
                     PRINT("[SANITIZER INFO] Context %p creation finished on device %p\n",
                             &pContextData->context, &pContextData->device);
+
+                    CUstream p_stream;
+                    Sanitizer_StreamHandle p_stream_handle;
+                    sanitizer_priority_stream_get(pContextData->context, &p_stream);
+                    PRINT("[SANITIZER INFO] Priority stream %p created on context %p\n",
+                            p_stream, pContextData->context);
                     break;
                 }
                 case SANITIZER_CBID_RESOURCE_CONTEXT_DESTROY_STARTING:
@@ -1041,6 +1056,64 @@ void ComputeSanitizerCallback(
                     CUdevice device_id = sanitizer_ctx_to_device[pModuleData->context];
 
                     PRINT("[SANITIZER INFO] Free memory %p with size %lu (flag: %u) on device %d\n",
+                            (void*)pModuleData->address, pModuleData->size, pModuleData->flags, device_id);
+
+                    yosemite_free_callback(
+                            pModuleData->address, pModuleData->size, pModuleData->flags, device_id);
+                    break;
+                }
+                case SANITIZER_CBID_RESOURCE_HOST_MEMORY_ALLOC:
+                {
+                    auto *pModuleData = (Sanitizer_ResourceMemoryData *)cbdata;
+                    if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0) {
+                        break;
+                    }
+                    PRINT("[SANITIZER INFO] Alloc host memory %p with size %lu (flag: %u)\n",
+                            (void*)pModuleData->address, pModuleData->size, pModuleData->flags);
+                    PRINT("[SANITIZER INFO] Sector tag: %p, end tag: %p\n", (void*)(pModuleData->address >> 5), (void*)((pModuleData->address + pModuleData->size - 1) >> 5));
+                    yosemite_alloc_callback(
+                            pModuleData->address, pModuleData->size, pModuleData->flags, 0);
+                    break;
+                }
+                case SANITIZER_CBID_RESOURCE_HOST_MEMORY_FREE:
+                {
+                    auto *pModuleData = (Sanitizer_ResourceMemoryData *)cbdata;
+                    if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0) {
+                        break;
+                    }
+                    
+                    PRINT("[SANITIZER INFO] Free host memory %p with size %lu (flag: %u)\n",
+                            (void*)pModuleData->address, pModuleData->size, pModuleData->flags);
+
+                    yosemite_free_callback(
+                            pModuleData->address, pModuleData->size, pModuleData->flags, 0);
+                    break;
+                }
+                case SANITIZER_CBID_RESOURCE_MEMORY_ALLOC_ASYNC:
+                {
+                    auto* pModuleData = (Sanitizer_ResourceMemoryData*)cbdata;
+                    if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0) {
+                        break;
+                    }
+
+                    CUdevice device_id = sanitizer_ctx_to_device[pModuleData->context];
+
+                    PRINT("[SANITIZER INFO] Alloc async memory %p with size %lu (flag: %u) on device %d\n",
+                            (void*)pModuleData->address, pModuleData->size, pModuleData->flags, device_id);
+                    yosemite_alloc_callback(
+                            pModuleData->address, pModuleData->size, pModuleData->flags, device_id);
+                    break;
+                }
+                case SANITIZER_CBID_RESOURCE_MEMORY_FREE_ASYNC:
+                {
+                    auto* pModuleData = (Sanitizer_ResourceMemoryData*)cbdata;
+                    if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0) {
+                        break;
+                    }
+
+                    CUdevice device_id = sanitizer_ctx_to_device[pModuleData->context];
+
+                    PRINT("[SANITIZER INFO] Free async memory %p with size %lu (flag: %u) on device %d\n",
                             (void*)pModuleData->address, pModuleData->size, pModuleData->flags, device_id);
 
                     yosemite_free_callback(

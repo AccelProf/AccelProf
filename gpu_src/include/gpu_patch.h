@@ -22,9 +22,10 @@ struct MemoryAccess
     uint64_t addresses[GPU_WARP_SIZE];
     uint32_t accessSize;
     uint32_t flags;
-    uint64_t warpId;
     uint64_t ctaId;
     uint64_t pc;
+    uint32_t warpId;
+    uint32_t distinct_sector_count;
     uint32_t active_mask;
     MemoryType type;
 
@@ -37,8 +38,9 @@ struct MemoryAccess
         }
         accessSize = other.accessSize;
         flags = other.flags;
-        warpId = other.warpId;
         ctaId = other.ctaId;
+        warpId = other.warpId;
+        distinct_sector_count = other.distinct_sector_count;
         type = other.type;
         pc = other.pc;
         active_mask = other.active_mask;
@@ -93,6 +95,7 @@ struct MemoryAccessTracker
     uint64_t accessCount;
     uint64_t accessSize;
     uint64_t kernel_pc;
+    bool enabled_instrumenting;
     int32_t target_block[3]; // target block to sample [x, y, z]
     DoorBell* doorBell;
     MemoryAccess* access_buffer;

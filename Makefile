@@ -42,9 +42,9 @@ endif
 TARGET_ARCH   := $(shell uname -m)
 
 ifeq ($(TARGET_ARCH),aarch64)
-    SMS        ?= 75 80 86 87 90 120
+    SMS        ?= 75 80 86 87 89 90 120
 else
-    SMS        ?= 75 80 86 90 120
+    SMS        ?= 75 80 86 89 90 120
 endif
 
 # Generate SASS code for each SM architecture listed in $(SMS)
