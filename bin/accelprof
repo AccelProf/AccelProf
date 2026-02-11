@@ -97,7 +97,6 @@ do
         ;;
     esac
 done
-
 EXECUTABLE=$1
 ARGS="${*:2}"
 
@@ -145,6 +144,11 @@ then
     echo "stdout redirect: ${OUTPUT_REDIRECT}"
 else
     export OUTPUT_REDIRECT=/dev/null
+fi
+
+if [ ! -z ${KERNEL_WHITELIST_FILE} ]
+then
+    export YOSEMITE_KERNEL_WHITELIST=${KERNEL_WHITELIST_FILE}
 fi
 
 # Profile the application with the specified tool
@@ -200,9 +204,6 @@ then
 elif [ ${TOOL} == "pc_dependency_analysis" ]
 then
     export YOSEMITE_TOOL_NAME=pc_dependency_analysis
-elif [ ! -z ${KERNEL_WHITELIST_FILE} ]
-then
-    export YOSEMITE_KERNEL_WHITELIST=${KERNEL_WHITELIST_FILE}
 elif [ ${TOOL} == "none" ]
 then
     export YOSEMITE_TOOL_NAME=none
