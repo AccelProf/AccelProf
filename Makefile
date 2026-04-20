@@ -9,6 +9,7 @@ CXX            ?= g++
 NVCC           := $(CUDA_PATH)/bin/nvcc -ccbin $(CXX)
 
 CXX_FLAGS      ?=
+EXTRA_CXX_FLAGS ?=
 INCLUDES       ?=
 LDFLAGS        ?=
 LINK_LIBS      ?=
@@ -35,6 +36,7 @@ ifeq ($(DEBUG), 1)
 else
 	CXX_FLAGS += -O3
 endif
+CXX_FLAGS += $(EXTRA_CXX_FLAGS)
 
 ################################################################################
 
@@ -96,7 +98,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(CXX_FLAGS) $(INCLUDES) -fPIC -o $@ -c $<
 
 $(PATCH_DIR)/%.fatbin: $(PATCH_SRC_DIR)/%.cu
-	$(NVCC) $(NVCC_FLAGS) $(NVCC_INCS) $(GENCODE_FLAGS) -o $@ -c $<
+	$(NVCC) $(NVCC_FLAGS) $(NVCC_INCS) $(GENCODE_FLAGS) -o $@ $<
 
 clean:
 	rm -rf $(LIB_DIR)

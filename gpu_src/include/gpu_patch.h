@@ -14,6 +14,7 @@ enum class MemoryType
     Global,
     Shared,
     Local,
+    BlockExit,
 };
 
 // Information regarding a memory access
@@ -27,6 +28,7 @@ struct MemoryAccess
     uint32_t warpId;
     uint32_t distinct_sector_count;
     uint32_t active_mask;
+    uint32_t unique_address_mask;
     MemoryType type;
 
     // copy constructor
@@ -44,6 +46,7 @@ struct MemoryAccess
         type = other.type;
         pc = other.pc;
         active_mask = other.active_mask;
+        unique_address_mask = other.unique_address_mask;
     }
 
     MemoryAccess() = default;

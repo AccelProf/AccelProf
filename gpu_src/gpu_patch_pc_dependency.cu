@@ -16,6 +16,7 @@ uint32_t GetBufferIndex(MemoryAccessTracker* pTracker) {
         if (idx >= MEMORY_ACCESS_BUFFER_SIZE) {
             // buffer is full, wait for last writing thread to flush
             while (*(volatile uint32_t*)&(pTracker->currentEntry) >= MEMORY_ACCESS_BUFFER_SIZE);
+            __threadfence();
         }
     }
 
@@ -32,11 +33,14 @@ void IncrementNumEntries(MemoryAccessTracker* pTracker) {
         // make sure everything is visible in memory
         __threadfence_system();
         doorbell->full = true;
+        __threadfence_system();
         while (doorbell->full);
 
-        pTracker->numEntries = 0;
+        // pTracker->numEntries = 0;
+        atomicExch((uint32_t*)&(pTracker->numEntries), static_cast<uint32_t>(0));
         __threadfence();
-        pTracker->currentEntry = 0;
+        // pTracker->currentEntry = 0;
+        atomicExch((uint32_t*)&(pTracker->currentEntry), static_cast<uint32_t>(0));
     }
 }
 
@@ -61,6 +65,7 @@ SanitizerPatchResult CommonCallback(
     MemoryAccess* accesses = nullptr;
 
     uint32_t distinct_sector_count = get_distint_sector_count((uint64_t)(uintptr_t)ptr/32, active_mask); // sector size is 32 bytes so we divide by 32 to get the sector tag
+    uint32_t unique_address_mask = get_unique_address_mask((uint64_t)(uintptr_t)ptr, active_mask);
 
     if (laneid == first_laneid) {
         uint32_t idx = GetBufferIndex(pTracker);
@@ -68,6 +73,7 @@ SanitizerPatchResult CommonCallback(
         accesses->accessSize = accessSize;
         accesses->flags = flags;
         accesses->distinct_sector_count = distinct_sector_count;
+        accesses->unique_address_mask = unique_address_mask;
         accesses->warpId = get_flat_thread_id() / GPU_WARP_SIZE;
         accesses->ctaId = get_ctaid_as_uint64();
         accesses->type = type;
@@ -148,6 +154,9 @@ SanitizerPatchResult BlockExitCallback(void* userdata, uint64_t pc)
 {
 
     MemoryAccessTracker* tracker = (MemoryAccessTracker*)userdata;
+    if (!tracker->enabled_instrumenting) {
+        return SANITIZER_PATCH_SUCCESS;
+    }
     DoorBell* doorbell = tracker->doorBell;
 
     uint32_t active_mask = __activemask();
@@ -156,7 +165,21 @@ SanitizerPatchResult BlockExitCallback(void* userdata, uint64_t pc)
     int32_t pop_count = __popc(active_mask);
 
     if (laneid == first_laneid) {
-        atomicAdd((int*)&doorbell->num_threads, -pop_count);
+        uint32_t idx = GetBufferIndex(tracker);
+        MemoryAccess* access = &tracker->access_buffer[idx];
+        access->accessSize = 0;
+        access->flags = 0;
+        access->distinct_sector_count = 0;
+        access->warpId = get_flat_thread_id() / GPU_WARP_SIZE;
+        access->ctaId = get_ctaid_as_uint64();
+        access->type = MemoryType::BlockExit;
+        access->pc = pc - tracker->kernel_pc;
+        access->active_mask = active_mask;
+        IncrementNumEntries(tracker);
+        atomicSub((uint32_t*)&doorbell->num_threads, static_cast<uint32_t>(pop_count));
+        // uint32_t new_num_threads = atomicSub((uint32_t*)&doorbell->num_threads, static_cast<uint32_t>(pop_count));
+        // printf("BlockExitCallback:Block id %lu, warp id %d, num_threads = %d, decrement = %d\n", access->ctaId, access->warpId, new_num_threads, pop_count);
+        __threadfence_system();
     }
     __syncwarp(active_mask);
 

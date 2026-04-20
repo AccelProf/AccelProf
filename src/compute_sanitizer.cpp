@@ -158,9 +158,9 @@ void ModuleUnloadedCallback(CUmodule module) {
 
     auto it = sanitizer_active_modules.find(module);
     assert(it != sanitizer_active_modules.end());
-    if (it->second) {   // unpatch if module is patched
-        SANITIZER_SAFECALL(sanitizerUnpatchModule(module));
-    }
+    // if (it->second) {   // unpatch if module is patched
+    //     SANITIZER_SAFECALL(sanitizerUnpatchModule(module));
+    // }
     sanitizer_active_modules.erase(it);
 }
 
@@ -474,9 +474,9 @@ void LaunchBeginCallback(
     dim3 blockDims,
     dim3 gridDims)
 {
+    bool launch_monitoring = true;
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
         // sampling
-        bool launch_monitoring = true;
         sanitizer_options.grid_launch_id++;
         if ((sanitizer_options.grid_launch_id % sanitizer_options.sample_rate == 0) &&
             SanitizerKernelWhiteListCheck(functionName)) {
@@ -492,14 +492,14 @@ void LaunchBeginCallback(
             PRINT("[SANITIZER INFO] Skipping kernel %s monitoring, launch id %lu\n",
                     functionName.c_str(), sanitizer_options.grid_launch_id);
             launch_monitoring = false;
-            auto it = sanitizer_active_modules.find(module);
-            if (it != sanitizer_active_modules.end()) {
-                if (it->second) {
-                    // SANITIZER_SAFECALL(sanitizerUnpatchModule(module));
-                    it->second = false;
-                }
-                return;
-            }
+            // auto it = sanitizer_active_modules.find(module);
+            // if (it != sanitizer_active_modules.end()) {
+            //     if (it->second) {
+            //         // SANITIZER_SAFECALL(sanitizerUnpatchModule(module));
+            //         it->second = false;
+            //     }
+            //     return;
+            // }
         }
 
         buffer_init(context);
@@ -676,7 +676,11 @@ void LaunchBeginCallback(
     }
 
     int device_id = sanitizer_ctx_to_device[context];
-    yosemite_kernel_start_callback(functionName, device_id);
+    if(launch_monitoring) {
+        yosemite_kernel_start_callback(
+            functionName, device_id, gridDims.x, gridDims.y, gridDims.z, blockDims.x, blockDims.y, blockDims.z
+        );
+    }
 }
 
 

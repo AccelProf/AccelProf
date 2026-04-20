@@ -80,6 +80,14 @@ __device__ __forceinline__ uint32_t get_distint_sector_count(uint64_t sector_tag
     return __popc(final_mask);
 }
 
+__device__ __forceinline__ uint32_t get_unique_address_mask(uint64_t addr_tag, uint32_t active_mask) {
+    uint32_t match_mask = 0;
+    match_mask = __match_any_sync(active_mask, addr_tag);
+    uint32_t leader = __ffs(match_mask) - 1;
+    uint32_t is_leader = (leader == get_laneid()) ? 1 : 0;
+    return __ballot_sync(active_mask, is_leader);
+}
+
 template <class T>
 __device__ __forceinline__ T shfl(T v, uint32_t srcline, uint32_t mask = 0xFFFFFFFF) {
     T ret;
