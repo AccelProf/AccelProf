@@ -14,6 +14,9 @@ Description: A collection of CUDA application profilers.
 Usage:
     -h, --help
         Print this help message.
+    -p, --perf
+        Enable Linux perf (perf record -g) together with accelprof.
+        Perf data will be saved to <RESULT_DIR>/<app_name>.perf.data.
     -t <tool_name>
         none: Do nothing.
         mem_trace: Trace memory access of CUDA kernels.
@@ -36,9 +39,14 @@ Usage:
             - nvbit (NVIDIA nvbit)
             - rocm (AMD ROCm)
     -b heatmap_analysis target block in x,y,z format.
+    -o <output_directory>
+        Specify the output directory for results.
     -w kernel_whitelist_file
         Specify the kernel whitelist file.
             - Example: ./kernel_whitelist.txt (each line in the file is a kernel name)
+    -n <num_workers>
+        Specify the number of worker threads for pc_dependency_analysis.
+        Defaults to the number of hardware threads if not set.
     -v
         Verbose mode.
 EOF
@@ -63,6 +71,10 @@ while [ -n "$1" ]
 do
     arg="$1" ; shift
     case "${arg}" in
+        -p|--perf)
+        export ENABLE_LINUX_PERF=1
+        OPTION_STR="${OPTION_STR} --perf"
+        ;;
         -t)
         export TOOL=$1
         shift
@@ -86,10 +98,20 @@ do
         shift
         OPTION_STR="${OPTION_STR} -b ${TARGET_BLOCK}"
         ;;
+        -o)
+        export RESULT_DIR=$1
+        shift
+        OPTION_STR="${OPTION_STR} -o ${RESULT_DIR}"
+        ;;
         -w)
         export KERNEL_WHITELIST_FILE=$1
         shift
         OPTION_STR="${OPTION_STR} -w ${KERNEL_WHITELIST_FILE}"
+        ;;
+        -n)
+        export YOSEMITE_WORKER_COUNT=$1
+        shift
+        OPTION_STR="${OPTION_STR} -n ${YOSEMITE_WORKER_COUNT}"
         ;;
         * )
         set -- "${arg}" "$@"
@@ -230,9 +252,14 @@ printf "%-30s: %s\n" "[ACCELPROF INFO] OPTIONS" \
         "${OPTION_STR}" >> ${OUTPUT_REDIRECT}
 printf "%-30s: %s %s\n" "[ACCELPROF INFO] COMMAND" \
         "${EXECUTABLE}" "${ARGS}" >> ${OUTPUT_REDIRECT}
+if [ "${ENABLE_LINUX_PERF}" = "1" ]; then
+    PERF_OUTPUT=${RESULT_DIR}/${YOSEMITE_APP_NAME}.perf.data
+    printf "%-30s: %s\n" "[ACCELPROF INFO] PERF" \
+        "enabled (perf record -g -o ${PERF_OUTPUT})" >> ${OUTPUT_REDIRECT}
+fi
 
-# Record start time in seconds since epoch
-start_time=$(date +%s)
+# Record start time in milliseconds since epoch
+start_time=$(date +%s%N)
 printf "%-30s: %s\n\n" "[ACCELPROF INFO] START TIME" "$(date)" >> ${OUTPUT_REDIRECT}
 
 # accelprof
@@ -260,9 +287,25 @@ fi
 if [ "${MGPU_PROFILING}" == "1" ]
 then
     export TORCH_PROFILE_ENABLED=1
-    CUDA_INJECTION64_PATH=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
+    if [ "${ENABLE_LINUX_PERF}" = "1" ]; then
+        if ! command -v perf >/dev/null 2>&1; then
+            error_hint "Linux perf is enabled, but 'perf' is not found in PATH."
+        fi
+        perf record --call-graph dwarf -F 99 -g -o "${PERF_OUTPUT}" -- env CUDA_INJECTION64_PATH=${LD_PRELOAD_LIB} \
+            ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
+    else
+        CUDA_INJECTION64_PATH=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
+    fi
 else
-    LD_PRELOAD=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
+    if [ "${ENABLE_LINUX_PERF}" = "1" ]; then
+        if ! command -v perf >/dev/null 2>&1; then
+            error_hint "Linux perf is enabled, but 'perf' is not found in PATH."
+        fi
+        perf record --call-graph dwarf -F 99 -g -o "${PERF_OUTPUT}" -- env LD_PRELOAD=${LD_PRELOAD_LIB} \
+            ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
+    else
+        LD_PRELOAD=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
+    fi
 fi
 
 
@@ -274,9 +317,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Record end time and calculate elapsed time
-end_time=$(date +%s)
-elapsed=$((end_time - start_time))
+# Record end time and calculate elapsed time in milliseconds
+end_time=$(date +%s%N)
+elapsed_ms=$(( (end_time - start_time) / 1000000 ))
 printf "%-30s: %s\n" "[ACCELPROF INFO] END TIME" "$(date)" >> ${OUTPUT_REDIRECT}
-printf "%-30s: %02d:%02d:%02d\n" "[ACCELPROF INFO] ELAPSED TIME" \
-        $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60)) >> ${OUTPUT_REDIRECT}
+printf "%-30s: %02d:%02d:%02d.%03d\n" "[ACCELPROF INFO] ELAPSED TIME" \
+        $((elapsed_ms/3600000)) $((elapsed_ms%3600000/60000)) $((elapsed_ms%60000/1000)) $((elapsed_ms%1000)) >> ${OUTPUT_REDIRECT}

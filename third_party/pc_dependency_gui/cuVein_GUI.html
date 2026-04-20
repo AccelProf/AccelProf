@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PC Dependency Analysis v4 (Streaming + Broadcast Detection)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; padding:0; display:flex; height:100vh; overflow:hidden; background:#fff; }
+
+        /* --- LAYOUT --- */
+        #sidebar { width:380px; background:#f8f9fa; border-right:1px solid #dee2e6; display:flex; flex-direction:column; z-index:2; box-shadow:2px 0 10px rgba(0,0,0,0.05); flex-shrink:0; overflow-y:scroll; }
+        #right-sidebar { width:340px; background:#fff; border-left:1px solid #dee2e6; display:flex; flex-direction:column; z-index:2; box-shadow:-2px 0 10px rgba(0,0,0,0.05); flex-shrink:0; }
+        #cy { flex-grow:1; background:#fafafa; z-index:1; }
+
+        /* --- COMMON --- */
+        .sidebar-section { padding:15px; border-bottom:1px solid #e9ecef; flex-shrink:0; }
+        h2 { margin:0 0 10px 0; font-size:16px; color:#212529; }
+        h3 { margin:0 0 8px 0; font-size:13px; color:#555; text-transform:uppercase; letter-spacing:0.5px; font-weight:bold; }
+
+        .meta-item { font-size:12px; margin-bottom:6px; color:#495057; display:flex; }
+        .meta-label { font-weight:bold; width:90px; flex-shrink:0; color:#343a40; }
+        .meta-value { word-break:break-all; font-family:'Consolas',monospace; cursor:help; }
+
+        input[type="file"] { width:100%; font-size:12px; }
+        input[type="text"] { width:100%; box-sizing:border-box; padding:5px; border:1px solid #ced4da; border-radius:4px; font-family:'Consolas',monospace; font-size:12px; margin-top:5px; }
+
+        #info-panel { flex-grow:1; padding:15px; font-family:'Consolas',monospace; font-size:12px; color:#333; }
+
+        /* Analysis Box */
+        #analysis-box { background:#fff3e0; border-bottom:1px solid #ffe0b2; padding:15px; display:none; overflow-y:auto; max-height:250px; flex-shrink:0; }
+        #analysis-box.active { display:block; }
+        .metric-big { font-size:20px; font-weight:bold; color:#d35400; font-family:'Segoe UI',sans-serif; margin-bottom:5px; }
+        .metric-row { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+
+        /* Global Stats */
+        #global-stats { background:#e3f2fd; border-bottom:1px solid #bbdefb; padding:15px; flex-shrink:0; }
+        .gs-section-title { font-size:11px; font-weight:bold; color:#555; margin-bottom:4px; border-bottom:1px solid #bbdefb; padding-bottom:2px; margin-top:8px; }
+        .gs-section-title:first-of-type { margin-top:0; }
+        .gs-row { display:flex; justify-content:space-between; margin-bottom:4px; font-size:12px; color:#333; }
+        .gs-val { font-family:'Consolas',monospace; font-weight:bold; }
+        .gs-label-read { color:#2980b9; } .gs-label-write { color:#c0392b; }
+
+        /* Layout controls */
+        #layout-controls { padding:10px 15px; border-bottom:1px solid #e9ecef; display:flex; gap:6px; align-items:center; flex-shrink:0; }
+        .btn { padding:4px 10px; font-size:11px; border:1px solid #ced4da; border-radius:4px; background:#fff; cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+        .btn:hover { background:#e9ecef; }
+        .btn.active { background:#0d6efd; color:#fff; border-color:#0d6efd; }
+
+        /* Accordion */
+        .accordion-container { flex-grow:1; overflow-y:auto; display:flex; flex-direction:column; }
+        .accordion-item { border-bottom:1px solid #eee; flex-shrink:0; }
+        .accordion-header { padding:12px 15px; background:#f8f9fa; cursor:pointer; font-size:13px; font-weight:bold; color:#444; display:flex; justify-content:space-between; align-items:center; transition:background 0.2s; }
+        .accordion-header:hover { background:#e9ecef; }
+        .accordion-header::after { content:'▼'; font-size:10px; color:#888; transition:transform 0.2s; }
+        .accordion-item.active .accordion-header::after { transform:rotate(180deg); }
+        .accordion-content { display:none; padding:10px; background:#fff; }
+        .accordion-item.active .accordion-content { display:block; }
+        .pattern-count { background:#e74c3c; color:white; border-radius:10px; padding:1px 6px; font-size:10px; margin-left:auto; margin-right:10px; display:none; }
+
+        /* Pattern Cards */
+        .pattern-card { background:#fff; border:1px solid #e0e0e0; border-radius:4px; padding:8px; margin-bottom:8px; cursor:pointer; transition:all 0.2s; border-left:4px solid #ccc; }
+        .pattern-card:hover { transform:translateX(-3px); box-shadow:0 2px 5px rgba(0,0,0,0.1); }
+        .pattern-card.p-rar  { border-left-color:#3498db; }
+        .pattern-card.p-raw  { border-left-color:#2ecc71; }
+        .pattern-card.p-waw  { border-left-color:#e74c3c; }
+        .pattern-card.p-grid { border-left-color:#2ecc71; }
+        .pattern-card.p-block { border-left-color:#e67e22; }
+        .pattern-card.p-atomic-high   { border-left-color:#c0392b; background:#fff5f5; }
+        .pattern-card.p-atomic-medium { border-left-color:#e67e22; background:#fffaf5; }
+        .pattern-card.p-atomic-low    { border-left-color:#f39c12; }
+        .pattern-card.p-uncoalesced-high   { border-left-color:#1565c0; background:#e8eaf6; }
+        .pattern-card.p-uncoalesced-medium { border-left-color:#1976d2; }
+        .pattern-card.p-streaming-high     { border-left-color:#00838f; background:#e0f7fa; }
+        .pattern-card.p-streaming-medium   { border-left-color:#00acc1; }
+        .pattern-card.p-broadcast-high   { border-left-color:#6a1b9a; background:#f3e5f5; }
+        .pattern-card.p-broadcast-medium { border-left-color:#7b1fa2; }
+
+        .p-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+        .p-pc { font-family:monospace; font-weight:bold; font-size:11px; color:#333; }
+        .p-tag { font-size:9px; padding:2px 5px; border-radius:3px; color:white; font-weight:bold; text-transform:uppercase; }
+        .tag-rar { background:#3498db; } .tag-raw { background:#2ecc71; } .tag-waw { background:#e74c3c; }
+        .tag-grid { background:#2ecc71; } .tag-block { background:#e67e22; }
+        .tag-atomic-high   { background:#c0392b; }
+        .tag-atomic-medium { background:#e67e22; }
+        .tag-atomic-low    { background:#f39c12; }
+        .tag-uncoalesced-high   { background:#1565c0; }
+        .tag-uncoalesced-medium { background:#1976d2; }
+        .tag-streaming-high     { background:#00838f; }
+        .tag-streaming-medium   { background:#00acc1; }
+        .tag-broadcast-high   { background:#6a1b9a; }
+        .tag-broadcast-medium { background:#7b1fa2; }
+
+        .p-desc { font-size:11px; color:#666; line-height:1.4; }
+
+        /* Tables */
+        .stat-table { width:100%; border-collapse:collapse; margin-top:5px; font-size:11px; }
+        .stat-table th, .stat-table td { text-align:left; padding:4px; border-bottom:1px solid #ddd; vertical-align:middle; }
+        .stat-table th { background:#e9ecef; color:#555; font-weight:600; }
+        .stat-row-total { font-weight:bold; background:#f8f9fa; border-top:2px solid #ccc; }
+
+        /* Legend */
+        .legend { padding:10px 15px; background:#fff; font-size:11px; border-top:1px solid #eee; flex-shrink:0; }
+        .legend-row { display:flex; flex-wrap:wrap; gap:10px; margin-top:5px; }
+        .legend-item { display:flex; align-items:center; }
+        .color-box { width:12px; height:12px; margin-right:5px; border-radius:2px; flex-shrink:0; }
+        .legend-diamond { width:12px; height:12px; margin-right:5px; transform:rotate(45deg); flex-shrink:0; }
+
+        .c-thread   { background:#e74c3c; }
+        .c-instance { background:#e91e63; }
+        .c-warp     { background:#f1c40f; }
+        .c-block    { background:#e67e22; }
+        .c-grid     { background:#2ecc71; }
+        .c-cold     { background:#3498db; }
+        .c-atomic   { background:#e67e22; }
+        .c-atomic-high { background:#c0392b; }
+
+        .badge { display:inline-block; padding:3px 6px; border-radius:4px; background:#e9ecef; border:1px solid #ced4da; margin-bottom:6px; font-weight:bold; }
+        .mem-badge { background:#f3e5f5; border-color:#d1c4e9; color:#6a1b9a; }
+        .atomic-badge { background:#fde8e8; border-color:#f5c6cb; color:#c0392b; }
+
+        #drop-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(33,37,41,0.85); z-index:9999; display:none; justify-content:center; align-items:center; color:white; }
+        #drop-overlay.active { display:flex; }
+        .drop-message { font-size:24px; font-weight:bold; border:3px dashed #fff; padding:40px; border-radius:10px; }
+
+        .progress-bg { background:#eee; height:8px; width:50px; border-radius:4px; overflow:hidden; display:inline-block; vertical-align:middle; margin-right:5px; }
+        .progress-fill { height:100%; border-radius:4px; }
+
+        .contention-bar { margin:6px 0; padding:6px 8px; border-radius:4px; font-size:11px; }
+        .contention-high   { background:#fde8e8; color:#c0392b; border-left:3px solid #c0392b; }
+        .contention-medium { background:#fff3e0; color:#e67e22; border-left:3px solid #e67e22; }
+        .contention-low    { background:#fffde7; color:#f57f17; border-left:3px solid #f9a825; }
+    </style>
+</head>
+<body>
+
+<div id="drop-overlay"><div class="drop-message">Drop JSON file here</div></div>
+
+<div id="sidebar">
+    <div class="sidebar-section" id="meta-panel">
+        <h2>Kernel Metadata</h2>
+        <div id="meta-content" style="color:#888; font-size:12px; font-style:italic;">No file loaded.</div>
+    </div>
+
+    <div id="global-stats">
+        <h3>Kernel Cold Miss Traffic</h3>
+
+        <div class="gs-section-title">GLOBAL MEMORY</div>
+        <div class="gs-row"><span class="gs-label-read">Read:</span><span class="gs-val" id="gs-global-read">0 B</span></div>
+        <div class="gs-row"><span class="gs-label-write">Write:</span><span class="gs-val" id="gs-global-write">0 B</span></div>
+
+        <div class="gs-section-title">SHARED MEMORY (per block)</div>
+        <div class="gs-row"><span class="gs-label-read">Read:</span><span class="gs-val" id="gs-shared-read">0 B</span></div>
+        <div class="gs-row"><span class="gs-label-write">Write:</span><span class="gs-val" id="gs-shared-write">0 B</span></div>
+
+        <div class="gs-row" style="margin-top:10px; border-top:1px dashed #999; padding-top:5px;">
+            <span style="font-weight:bold;">Total:</span>
+            <span class="gs-val" id="gs-total">0 B</span>
+        </div>
+    </div>
+
+    <div id="layout-controls">
+        <span style="font-size:11px; font-weight:bold; color:#555; flex-shrink:0;">Layout:</span>
+        <button class="btn active" id="btn-subgraph" onclick="switchLayout('subgraph')">Subgraph Groups</button>
+        <button class="btn" id="btn-linear" onclick="switchLayout('linear')">Linear (by PC)</button>
+    </div>
+
+    <div class="sidebar-section">
+        <label for="base-pc-input" style="font-size:12px; font-weight:bold; display:block;">Kernel Base PC (Hex):</label>
+        <input type="text" id="base-pc-input" placeholder="0x0" value="0x0">
+    </div>
+
+    <div id="analysis-box">
+        <div style="font-size:11px; color:#e67e22; font-weight:bold; margin-bottom:5px;">SELECTION METRICS</div>
+        <div class="metric-row">
+            <div>
+                <div style="font-size:10px; color:#888;">REUSE INTENSITY</div>
+                <div class="metric-big" id="metric-intensity">0.00</div>
+            </div>
+            <div style="text-align:right; font-size:11px; color:#555;">
+                Selected: <span id="metric-nodes" style="font-weight:bold;">0</span><br>
+                Total Wgt: <span id="metric-total">0</span>
+            </div>
+        </div>
+        <div class="metric-row" style="border-top:1px dashed #e67e22; padding-top:8px;">
+            <div>
+                <div style="font-size:10px; color:#888;">COLD MISS TRAFFIC</div>
+                <div class="metric-big" style="color:#6a1b9a;" id="metric-cold-traffic">0 B</div>
+            </div>
+        </div>
+        <div style="margin-top:10px; border-top:1px solid #ffe0b2; padding-top:10px;">
+            <div style="font-size:11px; color:#d35400; font-weight:bold;">Distribution</div>
+            <div id="metric-dist-content"></div>
+        </div>
+    </div>
+
+    <div class="sidebar-section">
+        <label for="file-upload" style="font-size:12px; font-weight:bold; display:block; margin-bottom:5px;">Load Trace:</label>
+        <input type="file" id="file-upload" accept=".json">
+    </div>
+
+    <div id="info-panel"><p><i>Hold <strong>Ctrl</strong> to select multiple nodes.<br>Click a node to view details.</i></p></div>
+
+    <div class="legend">
+        <strong>Node shapes</strong>
+        <div class="legend-row">
+            <div class="legend-item"><div class="color-box" style="background:#495057; border-radius:3px;"></div>Normal</div>
+            <div class="legend-item"><div class="legend-diamond" style="background:#e67e22;"></div>Atomic</div>
+            <div class="legend-item"><div class="legend-diamond" style="background:#c0392b;"></div>Atomic (High Contention)</div>
+        </div>
+        <strong style="display:block; margin-top:8px;">Edge types</strong>
+        <div class="legend-row">
+            <div class="legend-item"><div class="color-box c-thread"></div>Thread</div>
+            <div class="legend-item"><div class="color-box c-instance" style="border:1px dotted #a00;"></div>Instance Launch</div>
+            <div class="legend-item"><div class="color-box c-warp"></div>Warp</div>
+            <div class="legend-item"><div class="color-box c-block"></div>Block</div>
+            <div class="legend-item"><div class="color-box c-grid"></div>Grid</div>
+            <div class="legend-item"><div class="color-box c-cold"></div>Cold Miss</div>
+        </div>
+    </div>
+</div>
+
+<div id="cy"></div>
+
+<div id="right-sidebar">
+    <div class="sidebar-section" style="background:#fff3e0; border-bottom:1px solid #e67e22; flex-shrink:0;">
+        <h2 style="color:#d35400; margin-bottom:5px;">Detected Inefficiency</h2>
+        <div style="font-size:11px; color:#666;">Automated analysis of reuse &amp; access patterns.</div>
+    </div>
+
+    <div class="accordion-container">
+
+        <div class="accordion-item active">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                Uncoalesced Low-Reuse
+                <span id="cnt-uncoalesced" class="pattern-count">0</span>
+            </div>
+            <div id="list-uncoalesced" class="accordion-content">
+                <div style="color:#888; font-size:12px; font-style:italic;">No uncoalesced low-reuse access detected.</div>
+            </div>
+        </div>
+
+        <div class="accordion-item active">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                Streaming Access
+                <span id="cnt-streaming" class="pattern-count">0</span>
+            </div>
+            <div id="list-streaming" class="accordion-content">
+                <div style="color:#888; font-size:12px; font-style:italic;">No streaming access detected.</div>
+            </div>
+        </div>
+
+        <div class="accordion-item active">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                Broadcasting
+                <span id="cnt-broadcast" class="pattern-count">0</span>
+            </div>
+            <div id="list-broadcast" class="accordion-content">
+                <div style="color:#888; font-size:12px; font-style:italic;">No broadcast patterns detected.</div>
+            </div>
+        </div>
+
+        <div class="accordion-item active">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                Redundancy Patterns
+                <span id="cnt-redundancy" class="pattern-count">0</span>
+            </div>
+            <div id="list-redundancy" class="accordion-content">
+                <div style="color:#888; font-size:12px; font-style:italic;">No patterns detected.</div>
+            </div>
+        </div>
+
+        <div class="accordion-item">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                High Intra-Grid Reuse
+                <span id="cnt-grid" class="pattern-count">0</span>
+            </div>
+            <div id="list-grid" class="accordion-content">
+                <div style="color:#888; font-size:12px; font-style:italic;">No nodes &gt; 60% Grid Reuse.</div>
+            </div>
+        </div>
+
+        <div class="accordion-item">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                High Intra-Block Reuse
+                <span id="cnt-block" class="pattern-count">0</span>
+            </div>
+            <div id="list-block" class="accordion-content">
+                <div style="color:#888; font-size:12px; font-style:italic;">No Global nodes &gt; 60% Block/Warp/Thread Reuse.</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // ---- State ----
+    let globalJsonData = null;
+    let currentLayout = 'subgraph';
+
+    // ---- Cytoscape Setup ----
+    const COMP_COLORS = [
+        { bg: 'rgba(232,245,233,0.65)', border: '#66bb6a' },
+        { bg: 'rgba(227,242,253,0.65)', border: '#42a5f5' },
+        { bg: 'rgba(243,229,245,0.65)', border: '#ab47bc' },
+        { bg: 'rgba(255,248,225,0.65)', border: '#ffca28' },
+        { bg: 'rgba(224,242,241,0.65)', border: '#26a69a' },
+        { bg: 'rgba(251,233,231,0.65)', border: '#ff7043' },
+        { bg: 'rgba(241,248,233,0.65)', border: '#9ccc65' },
+        { bg: 'rgba(252,228,236,0.65)', border: '#ec407a' },
+    ];
+
+    let cy = cytoscape({
+        container: document.getElementById('cy'),
+        boxSelectionEnabled: true,
+        style: [
+            {
+                selector: 'node',
+                style: {
+                    'label': 'data(label)',
+                    'text-valign': 'center', 'text-halign': 'center', 'text-wrap': 'wrap',
+                    'background-color': '#495057', 'color': '#fff', 'font-size': '13px',
+                    'width': '120px', 'height': '56px', 'shape': 'round-rectangle',
+                    'border-width': 1, 'border-color': '#212529',
+                    'transition-property': 'background-color, border-color, opacity',
+                    'transition-duration': '0.25s'
+                }
+            },
+            {
+                selector: '#COLD_MISS',
+                style: {
+                    'background-color': '#3498db', 'shape': 'ellipse',
+                    'width': '130px', 'height': '130px', 'label': 'UNTRACKED\nMEMORY\nREGION',
+                    'border-width': 2, 'border-color': '#1a6fa0'
+                }
+            },
+            {
+                selector: 'node.subgraph-group',
+                style: {
+                    'background-color': 'data(bgColor)',
+                    'border-color': 'data(borderColor)',
+                    'border-width': 2,
+                    'border-style': 'dashed',
+                    'label': 'data(groupLabel)',
+                    'text-valign': 'top', 'text-halign': 'center',
+                    'font-size': '10px', 'color': '#888',
+                    'text-margin-y': 6,
+                    'padding': '25px',
+                    'shape': 'round-rectangle',
+                    'z-compound-depth': 'bottom'
+                }
+            },
+            {
+                selector: 'node.atomic',
+                style: {
+                    'shape': 'diamond',
+                    'background-color': '#e67e22',
+                    'border-color': '#a04000',
+                    'border-width': 2,
+                    'width': '115px', 'height': '58px'
+                }
+            },
+            {
+                selector: 'node.atomic-high',
+                style: {
+                    'background-color': '#c0392b',
+                    'border-color': '#7b241c',
+                    'border-width': 3
+                }
+            },
+            {
+                selector: 'edge',
+                style: {
+                    'width': 'data(displayWidth)',
+                    'curve-style': 'bezier',
+                    'control-point-step-size': 80,
+                    'target-arrow-shape': 'triangle',
+                    'opacity': 0.8, 'arrow-scale': 1.2,
+                    'transition-property': 'opacity, line-color',
+                    'transition-duration': '0.25s'
+                }
+            },
+            { selector: '.intra_thread',          style: { 'line-color': '#e74c3c', 'target-arrow-color': '#e74c3c' } },
+            { selector: '.intra_instance_launch', style: { 'line-color': '#e91e63', 'target-arrow-color': '#e91e63', 'line-style': 'dotted' } },
+            { selector: '.intra_warp',            style: { 'line-color': '#f1c40f', 'target-arrow-color': '#f1c40f' } },
+            { selector: '.intra_block',           style: { 'line-color': '#e67e22', 'target-arrow-color': '#e67e22' } },
+            { selector: '.intra_grid',            style: { 'line-color': '#2ecc71', 'target-arrow-color': '#2ecc71' } },
+            { selector: '.cold_miss',             style: { 'line-color': '#3498db', 'target-arrow-color': '#3498db', 'line-style': 'dashed' } },
+            { selector: '.faded',    style: { 'opacity': 0.06, 'text-opacity': 0 } },
+            { selector: '.highlight', style: { 'opacity': 1, 'z-index': 9999, 'text-opacity': 1 } },
+            { selector: 'node.highlight', style: { 'border-width': 3, 'border-color': '#000', 'font-weight': 'bold' } },
+            { selector: ':selected', style: { 'border-width': 3, 'border-color': '#d35400', 'background-color': '#555' } }
+        ],
+        layout: { name: 'preset' },
+        wheelSensitivity: 0.2
+    });
+
+    // ---- Helpers ----
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function getDisplayPC(originalHex) {
+        if (!originalHex) return 'N/A';
+        try {
+            const val = document.getElementById('base-pc-input').value.trim();
+            const baseStr = val.startsWith('0x') ? val : '0x' + (val || '0');
+            return '0x' + (BigInt(baseStr) + BigInt(originalHex)).toString(16);
+        } catch(e) { return originalHex; }
+    }
+
+    function sumDist(dist) {
+        return Object.values(dist).reduce((a, b) => a + b, 0);
+    }
+
+    function logWidth(count) {
+        return 1 + (Math.log(Math.max(1, count)) / Math.log(100) * 4);
+    }
+
+    // Weighted mean of a histogram object { "bucket": count, ... }
+    function weightedMean(hist) {
+        if (!hist) return 0;
+        let wSum = 0, total = 0;
+        Object.entries(hist).forEach(([k, v]) => { wSum += parseInt(k) * v; total += v; });
+        return total > 0 ? wSum / total : 0;
+    }
+
+    // ---- Connected Component Detection ----
+    function findConnectedComponents(nodes, edges) {
+        const nodeIds = new Set(nodes.map(n => n.pc.toString()));
+        const adj = new Map();
+        nodeIds.forEach(id => adj.set(id, new Set()));
+
+        (edges || []).forEach(e => {
+            if (e.cold_miss) return;
+            const src = e.current_pc.toString();
+            const tgt = e.ancient_pc.toString();
+            if (src !== tgt && nodeIds.has(src) && nodeIds.has(tgt)) {
+                adj.get(src).add(tgt);
+                adj.get(tgt).add(src);
+            }
+        });
+
+        const visited = new Set();
+        const components = [];
+        [...nodes].sort((a, b) => a.pc - b.pc).forEach(n => {
+            const id = n.pc.toString();
+            if (visited.has(id)) return;
+            const comp = [];
+            const queue = [id];
+            while (queue.length) {
+                const curr = queue.shift();
+                if (visited.has(curr)) continue;
+                visited.add(curr);
+                comp.push(curr);
+                adj.get(curr)?.forEach(nb => { if (!visited.has(nb)) queue.push(nb); });
+            }
+            components.push(comp);
+        });
+        return components;
+    }
+
+    // ---- Layout Computation ----
+    const COL_W   = 200;
+    const COL_GAP = 120;
+    const ROW_H   = 170;
+    const START_Y = 260;
+
+    function computeSubgraphLayout(nodes, edges) {
+        const components = findConnectedComponents(nodes, edges);
+        components.sort((a, b) => {
+            if (b.length !== a.length) return b.length - a.length;
+            return parseInt(a[0]) - parseInt(b[0]);
+        });
+
+        const pcToPos     = new Map();
+        const pcToCompIdx = new Map();
+        let curX = COL_W / 2 + 20;
+
+        components.forEach((comp, ci) => {
+            const ids = [...comp].sort((a, b) => parseInt(a) - parseInt(b));
+            ids.forEach((id, ni) => {
+                pcToPos.set(id, { x: curX, y: START_Y + ni * ROW_H });
+                pcToCompIdx.set(id, ci);
+            });
+            curX += COL_W + COL_GAP;
+        });
+
+        const totalW = Math.max(curX - COL_GAP + COL_W / 2, 400);
+        return { pcToPos, pcToCompIdx, components, coldMissX: totalW / 2 };
+    }
+
+    function computeLinearLayout(nodes) {
+        const pcToPos = new Map();
+        [...nodes].sort((a, b) => a.pc - b.pc).forEach((n, i) => {
+            pcToPos.set(n.pc.toString(), { x: 500, y: START_Y + i * ROW_H });
+        });
+        return { pcToPos, coldMissX: 500 };
+    }
+
+    // ---- Rendering ----
+    function renderGraph(data) {
+        cy.elements().remove();
+        const nodes = data.nodes || [];
+        const edges = data.edges || [];
+        const elements = [];
+
+        const nodeInTotals = {};
+        edges.forEach(e => {
+            const tgt = e.current_pc.toString();
+            nodeInTotals[tgt] = (nodeInTotals[tgt] || 0) + sumDist(e.dist);
+        });
+
+        const atomicStats = new Map();
+        edges.forEach(e => {
+            if (e.cold_miss) return;
+            const id = e.current_pc.toString();
+            if (!atomicStats.has(id)) atomicStats.set(id, { total: 0, cross: 0 });
+            const s = atomicStats.get(id);
+            const total = sumDist(e.dist);
+            s.total += total;
+            s.cross += (e.dist.intra_block || 0) + (e.dist.intra_grid || 0);
+        });
+
+        let pcToPos, coldMissX, pcToCompIdx = null, components = null;
+        if (currentLayout === 'subgraph') {
+            const L = computeSubgraphLayout(nodes, edges);
+            pcToPos = L.pcToPos; coldMissX = L.coldMissX;
+            pcToCompIdx = L.pcToCompIdx; components = L.components;
+        } else {
+            const L = computeLinearLayout(nodes);
+            pcToPos = L.pcToPos; coldMissX = L.coldMissX;
+        }
+
+        if (currentLayout === 'subgraph' && components) {
+            components.forEach((comp, ci) => {
+                if (comp.length < 2) return;
+                const col = COMP_COLORS[ci % COMP_COLORS.length];
+                elements.push({
+                    data: {
+                        id: `__grp_${ci}`,
+                        groupLabel: `Group ${ci + 1}  (${comp.length} nodes)`,
+                        bgColor: col.bg,
+                        borderColor: col.border
+                    },
+                    classes: 'subgraph-group'
+                });
+            });
+        }
+
+        elements.push({
+            data: { id: 'COLD_MISS', label: 'UNTRACKED\nMEMORY\nREGION' },
+            position: { x: coldMissX, y: currentLayout === 'subgraph' ? 70 : 0 }
+        });
+
+        const pcSet = new Set();
+        nodes.forEach(node => {
+            const id = node.pc.toString();
+            const pos = pcToPos.get(id) || { x: 300, y: 300 };
+            const displayHex = getDisplayPC(node.pc_hex);
+            const flags = node.flags || '';
+            const isAtomic = flags.includes('ATOMIC');
+
+            const stats = atomicStats.get(id);
+            const contentionPct = (stats && stats.total > 0) ? stats.cross / stats.total : 0;
+            const isHighContention = isAtomic && contentionPct > 0.5;
+
+            const nodeClasses = [
+                isAtomic ? 'atomic' : '',
+                isHighContention ? 'atomic-high' : ''
+            ].filter(Boolean).join(' ');
+
+            const nodeData = {
+                data: {
+                    id,
+                    label: displayHex + (flags ? '\n' + flags : '') + (node.access_size ? '\n' + node.access_size + ' Byte' : ''),
+                    raw: node,
+                    displayPc: displayHex,
+                    nodeTotalIn: nodeInTotals[id] || 0,
+                    isAtomic,
+                    contentionPct,
+                    access_size: node.access_size,
+                    distinct_sector_count: node.distinct_sector_count,
+                    active_lane_count: node.active_lane_count,
+                    distinct_address_count: node.distinct_address_count
+                },
+                position: pos,
+                classes: nodeClasses
+            };
+
+            if (currentLayout === 'subgraph' && pcToCompIdx) {
+                const ci = pcToCompIdx.get(id);
+                if (ci !== undefined && components[ci].length >= 2) {
+                    nodeData.data.parent = `__grp_${ci}`;
+                }
+            }
+
+            elements.push(nodeData);
+            pcSet.add(id);
+        });
+
+        edges.forEach((edge, idx) => {
+            const srcId = edge.current_pc.toString();
+            if (!pcSet.has(srcId)) return;
+            const pairTotal = sumDist(edge.dist);
+            const nodeTotal = nodeInTotals[srcId] || pairTotal;
+
+            const addEdge = (target, type, count) => {
+                if (target !== 'COLD_MISS' && !pcSet.has(target)) return;
+                elements.push({
+                    data: {
+                        id: `e_${idx}_${type}`,
+                        source: srcId, target,
+                        type, count,
+                        countFmt: count.toLocaleString(),
+                        displayWidth: logWidth(count),
+                        pairTotal, nodeTotal,
+                        pairPct: pairTotal > 0 ? ((count / pairTotal) * 100).toFixed(1) : '0',
+                        nodePct: nodeTotal > 0 ? ((count / nodeTotal) * 100).toFixed(1) : '0',
+                        accessSize: edge.current_access_size,
+                        raw: edge
+                    },
+                    classes: type
+                });
+            };
+
+            if (edge.cold_miss) {
+                addEdge('COLD_MISS', 'cold_miss', pairTotal);
+            } else {
+                const ancId = edge.ancient_pc.toString();
+                ['intra_thread', 'intra_instance_launch', 'intra_warp', 'intra_block', 'intra_grid'].forEach(type => {
+                    const count = edge.dist[type];
+                    if (count > 0) addEdge(ancId, type, count);
+                });
+            }
+        });
+
+        cy.add(elements);
+        cy.fit(undefined, 50);
+    }
+
+    // ---- Global Stats ----
+    function calculateGlobalStats(data) {
+        let globalRead = 0, globalWrite = 0, sharedRead = 0, sharedWrite = 0;
+        const pcFlags = {};
+        (data.nodes || []).forEach(n => pcFlags[n.pc] = n.flags || '');
+
+        (data.edges || []).forEach(e => {
+            if (!e.cold_miss) return;
+            const count = sumDist(e.dist);
+            const size = e.current_access_size || 4;
+            const traffic = size < 4 ? size * count : (size * count) / Math.ceil(size / 4);
+            const flags = pcFlags[e.current_pc] || '';
+            if (flags.includes('SHARED')) {
+                if (flags.includes('WRITE')) sharedWrite += traffic; else sharedRead += traffic;
+            } else {
+                if (flags.includes('WRITE')) globalWrite += traffic; else globalRead += traffic;
+            }
+        });
+
+        const ctaCount = (data.kernel && data.kernel.grid_cta_count) || 1;
+        const sharedReadPerBlock  = sharedRead  / ctaCount;
+        const sharedWritePerBlock = sharedWrite / ctaCount;
+
+        document.getElementById('gs-global-read').innerText  = formatBytes(globalRead);
+        document.getElementById('gs-global-write').innerText = formatBytes(globalWrite);
+        document.getElementById('gs-shared-read').innerText  = formatBytes(sharedReadPerBlock);
+        document.getElementById('gs-shared-write').innerText = formatBytes(sharedWritePerBlock);
+        document.getElementById('gs-total').innerText =
+            formatBytes(globalRead + globalWrite + sharedRead + sharedWrite);
+    }
+
+    // ---- Inefficiency Detection ----
+    function detectInefficiencies(data) {
+        const nodes = data.nodes || [];
+        const edges = data.edges || [];
+
+        const edgesByPc = new Map();
+        edges.forEach(e => {
+            if (!edgesByPc.has(e.current_pc)) edgesByPc.set(e.current_pc, []);
+            edgesByPc.get(e.current_pc).push(e);
+        });
+        const pcFlagMap = new Map();
+        nodes.forEach(n => pcFlagMap.set(n.pc, n.flags || ''));
+
+        const listUncoalesced = document.getElementById('list-uncoalesced');
+        const listStreaming   = document.getElementById('list-streaming');
+        const listBroadcast   = document.getElementById('list-broadcast');
+        const listRedundancy  = document.getElementById('list-redundancy');
+        const listGrid        = document.getElementById('list-grid');
+        const listBlock       = document.getElementById('list-block');
+        [listUncoalesced, listStreaming, listBroadcast, listRedundancy, listGrid, listBlock].forEach(el => el.innerHTML = '');
+
+        let numUncoalesced = 0, numStreaming = 0, numBroadcast = 0, numRedundancy = 0, numGrid = 0, numBlock = 0;
+
+        nodes.forEach(node => {
+            const deps = edgesByPc.get(node.pc) || [];
+            if (!deps.length) return;
+
+            let totalWeight = 0;
+            let sumThread = 0, sumWarp = 0, sumBlock = 0, sumGrid = 0;
+            // intra_instance_launch is excluded from all reuse calculations — it causes no
+            // actual memory traffic and is directly broadcasted within the warp.
+            let allIntraThread = true, allAncientWrites = true, allAncientReads = true;
+
+            deps.forEach(e => {
+                const w = sumDist(e.dist);
+                totalWeight += w;
+                if (!e.cold_miss) {
+                    sumThread += e.dist.intra_thread || 0;
+                    sumWarp   += e.dist.intra_warp   || 0;
+                    sumBlock  += e.dist.intra_block  || 0;
+                    sumGrid   += e.dist.intra_grid   || 0;
+                }
+                // Treat intra_instance_launch as transparent: only thread/warp/block/grid
+                // scopes disqualify a pure intra-thread access chain.
+                const onlyThread = !e.cold_miss && (e.dist.intra_thread > 0) &&
+                    !e.dist.intra_warp && !e.dist.intra_block && !e.dist.intra_grid;
+                if (!onlyThread) allIntraThread = false;
+
+                const af = pcFlagMap.get(e.ancient_pc) || '';
+                if (!af) { allAncientWrites = false; allAncientReads = false; }
+                else {
+                    if (!af.includes('WRITE')) allAncientWrites = false;
+                    if (!af.includes('READ'))  allAncientReads  = false;
+                }
+            });
+            if (!totalWeight) return;
+
+            const displayHex = getDisplayPC(node.pc_hex);
+            const flags      = node.flags || '';
+            const isGlobal   = flags.includes('GLOBAL');
+            const isShared   = flags.includes('SHARED');
+            const isAtomic   = flags.includes('ATOMIC');
+            const accessSize = node.access_size || 4;
+
+            // Cold-miss weight = total minus all real reuse scopes
+            // (intra_instance_launch excluded from reuse, but its weight was added to
+            //  totalWeight via sumDist on non-cold_miss edges — compute cold miss directly)
+            let coldMissWeight = 0;
+            deps.forEach(e => { if (e.cold_miss) coldMissWeight += sumDist(e.dist); });
+            const coldMissRatio = totalWeight > 0 ? coldMissWeight / totalWeight : 0;
+
+            // Compute sector density once — shared by both GLOBAL checks below
+            const meanSector = weightedMean(node.distinct_sector_count);
+            const meanLane   = weightedMean(node.active_lane_count);
+            // threads_per_sector for a 32-byte sector, normalized by access size
+            const threadsPerSector = Math.max(1, 32 / accessSize);
+            // sectorDensity = 1.0 → perfectly coalesced; higher → more divergent/strided
+            const sectorDensity = meanLane > 0 ? (meanSector / meanLane) * threadsPerSector : 0;
+
+            // 1. Uncoalesced low-reuse — GLOBAL memory only
+            //    Poor coalescing (high sectorDensity) AND no reuse: threads pull divergent
+            //    sectors with nothing to amortize the excess bandwidth cost.
+            if (isGlobal && sectorDensity > 2.0 && coldMissRatio > 0.7) {
+                const isHigh = sectorDensity > 4.0 && coldMissRatio > 0.9;
+                const severity  = isHigh ? 'HIGH' : 'MEDIUM';
+                const cardClass = isHigh ? 'p-uncoalesced-high' : 'p-uncoalesced-medium';
+                const tagClass  = isHigh ? 'tag-uncoalesced-high' : 'tag-uncoalesced-medium';
+                const desc = `Sector density ${sectorDensity.toFixed(2)}× the coalesced baseline, ` +
+                             `${(coldMissRatio * 100).toFixed(1)}% cold miss. ` +
+                             `Threads are accessing divergent sectors with no reuse to amortize the cost — ` +
+                             `consider coalescing access patterns (SoA layout, aligned/unit strides).`;
+                createCard(listUncoalesced, node, displayHex, `UNCOALESCED ${severity}`, cardClass, tagClass, desc);
+                numUncoalesced++;
+            }
+
+            // 2. Streaming access — GLOBAL memory only
+            //    Well-coalesced (sectorDensity near 1) but high cold-miss ratio: data flows
+            //    through cache without reuse, pressuring L2 bandwidth.
+            if (isGlobal && sectorDensity <= 2.0 && coldMissRatio > 0.8) {
+                const isHigh = coldMissRatio > 0.95;
+                const severity  = isHigh ? 'HIGH' : 'MEDIUM';
+                const cardClass = isHigh ? 'p-streaming-high' : 'p-streaming-medium';
+                const tagClass  = isHigh ? 'tag-streaming-high' : 'tag-streaming-medium';
+                const desc = `${(coldMissRatio * 100).toFixed(1)}% cold miss with sector density ` +
+                             `${sectorDensity.toFixed(2)}× (well-coalesced). Data streams through ` +
+                             `cache without reuse, pressuring L2 bandwidth — ` +
+                             `consider __ldcs/__stcs hints or tiling to improve cache utilization.`;
+                createCard(listStreaming, node, displayHex, `STREAMING ${severity}`, cardClass, tagClass, desc);
+                numStreaming++;
+            }
+
+            // 2. Broadcasting — any memory type
+            //    Criterion: many active lanes sharing very few distinct addresses
+            {
+                const meanAddr = weightedMean(node.distinct_address_count);
+                const meanLane = weightedMean(node.active_lane_count);
+                const broadcastRatio = meanLane > 0 ? meanAddr / meanLane : 1;
+
+                if (broadcastRatio < 0.25 && meanLane > 0) {
+                    const isHigh = broadcastRatio < 0.1;
+                    const severity  = isHigh ? 'HIGH' : 'MEDIUM';
+                    const cardClass = isHigh ? 'p-broadcast-high' : 'p-broadcast-medium';
+                    const tagClass  = isHigh ? 'tag-broadcast-high' : 'tag-broadcast-medium';
+                    const rwHint = flags.includes('READ')
+                        ? 'Read broadcast — consider moving to __constant__ memory or smem if GLOBAL.'
+                        : 'Write broadcast — multiple threads targeting the same address may cause races.';
+                    const desc = `${(broadcastRatio * 100).toFixed(1)}% distinct addresses per active lane ` +
+                                 `(avg ${meanAddr.toFixed(1)} addr / ${meanLane.toFixed(1)} lanes). ${rwHint}`;
+                    createCard(listBroadcast, node, displayHex, `BROADCAST ${severity}`, cardClass, tagClass, desc);
+                    numBroadcast++;
+                }
+            }
+
+            // 3. Redundancy patterns (purely intra-thread, intra_instance_launch ignored)
+            if (allIntraThread) {
+                const isRead = flags.includes('READ'), isWrite = flags.includes('WRITE');
+                if (isRead && allAncientReads) {
+                    createCard(listRedundancy, node, displayHex, 'RAR (Redundant Read)',  'p-rar', 'tag-rar', 'Purely intra-thread Read-After-Read.');
+                    numRedundancy++;
+                } else if (isRead && allAncientWrites) {
+                    createCard(listRedundancy, node, displayHex, 'RAW (Redundant Load)',  'p-raw', 'tag-raw', 'Purely intra-thread Read-After-Write.');
+                    numRedundancy++;
+                } else if (isWrite && allAncientWrites) {
+                    createCard(listRedundancy, node, displayHex, 'WAW (Redundant Write)', 'p-waw', 'tag-waw', 'Purely intra-thread Write-After-Write.');
+                    numRedundancy++;
+                }
+            }
+
+            // 4. High intra-grid reuse
+            const pctGrid = (sumGrid / totalWeight) * 100;
+            if (pctGrid > 60) {
+                createCard(listGrid, node, displayHex,
+                    `Grid Reuse: ${pctGrid.toFixed(1)}%`, 'p-grid', 'tag-grid',
+                    'High data reuse across blocks — consider shared memory caching.');
+                numGrid++;
+            }
+
+            // 5. High intra-block reuse (non-shared memory only; intra_instance_launch excluded)
+            const pctLocal = ((sumThread + sumWarp + sumBlock) / totalWeight) * 100;
+            if (pctLocal > 60 && !isShared) {
+                createCard(listBlock, node, displayHex,
+                    `Local Reuse: ${pctLocal.toFixed(1)}%`, 'p-block', 'tag-block',
+                    'High local data reuse (Thread/Warp/Block). Consider register reuse.');
+                numBlock++;
+            }
+        });
+
+        setSection('cnt-uncoalesced', listUncoalesced, numUncoalesced, 'No uncoalesced low-reuse access detected.');
+        setSection('cnt-streaming',  listStreaming,   numStreaming,   'No streaming access detected.');
+        setSection('cnt-broadcast',  listBroadcast,   numBroadcast,   'No broadcast patterns detected.');
+        setSection('cnt-redundancy', listRedundancy,  numRedundancy,  'No patterns detected.');
+        setSection('cnt-grid',       listGrid,        numGrid,        'No nodes > 60% Grid Reuse.');
+        setSection('cnt-block',      listBlock,       numBlock,       'No Global nodes > 60% Block/Warp/Thread Reuse.');
+    }
+
+    function setSection(cntId, listEl, num, emptyMsg) {
+        const cntEl = document.getElementById(cntId);
+        cntEl.innerText = num;
+        cntEl.style.display = num > 0 ? 'inline-block' : 'none';
+        if (num === 0) listEl.innerHTML = `<div style="color:#888; font-size:12px; font-style:italic;">${emptyMsg}</div>`;
+    }
+
+    function createCard(container, node, displayHex, title, cardClass, tagClass, desc) {
+        const div = document.createElement('div');
+        div.className = `pattern-card ${cardClass}`;
+        div.innerHTML = `<div class="p-header"><span class="p-pc">${displayHex}</span><span class="p-tag ${tagClass}">${title}</span></div><div class="p-desc">${desc}</div>`;
+        div.addEventListener('click', () => focusOnNode(node.pc.toString()));
+        container.appendChild(div);
+    }
+
+    // ---- File Handling ----
+    document.getElementById('file-upload').addEventListener('change', e => {
+        if (e.target.files[0]) processFile(e.target.files[0]);
+    });
+    document.getElementById('base-pc-input').addEventListener('change', () => {
+        if (!globalJsonData) return;
+        updateMetadata(globalJsonData.kernel);
+        renderGraph(globalJsonData);
+        detectInefficiencies(globalJsonData);
+        document.getElementById('analysis-box').classList.remove('active');
+    });
+
+    const overlay = document.getElementById('drop-overlay');
+    ['dragenter','dragover','dragleave','drop'].forEach(ev =>
+        document.body.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
+    ['dragenter','dragover'].forEach(ev => document.body.addEventListener(ev, () => overlay.classList.add('active')));
+    ['dragleave','drop'].forEach(ev => document.body.addEventListener(ev, () => overlay.classList.remove('active')));
+    document.body.addEventListener('drop', e => { if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0]); });
+
+    function processFile(file) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const json = JSON.parse(e.target.result);
+                globalJsonData = json;
+                updateMetadata(json.kernel);
+                calculateGlobalStats(json);
+                renderGraph(json);
+                detectInefficiencies(json);
+            } catch(err) { alert('Parse Error: ' + err); }
+        };
+        reader.readAsText(file);
+    }
+
+    function updateMetadata(kernel) {
+        const p = document.getElementById('meta-content');
+        if (!kernel) { p.innerHTML = 'No metadata.'; return; }
+        const safe = v => v !== undefined ? v : 'N/A';
+        const rawName = safe(kernel.kernel_name);
+        const displayName = rawName.length > 100
+            ? rawName.substring(0, 50) + '…' + rawName.substring(rawName.length - 50)
+            : rawName;
+        const fmtDim = d => Array.isArray(d) ? d.join(' × ') : safe(d);
+        const gridDim   = fmtDim(kernel.grid_dim);
+        const blockDim  = fmtDim(kernel.block_dim);
+        const gridTotal = kernel.grid_cta_count !== undefined ? ` (${kernel.grid_cta_count} CTAs)` : '';
+        const blkTotal  = kernel.block_thread_count !== undefined ? ` (${kernel.block_thread_count} threads)` : '';
+        p.innerHTML = `
+            <div class="meta-item" title="${rawName}">
+                <span class="meta-label">Kernel:</span><span class="meta-value">${displayName}</span>
+            </div>
+            <div class="meta-item"><span class="meta-label">ID:</span><span class="meta-value">${safe(kernel.kernel_id)}</span></div>
+            <div class="meta-item"><span class="meta-label">Device:</span><span class="meta-value">${safe(kernel.device_id)}</span></div>
+            <div class="meta-item"><span class="meta-label">Grid:</span><span class="meta-value">${gridDim}${gridTotal}</span></div>
+            <div class="meta-item"><span class="meta-label">Block:</span><span class="meta-value">${blockDim}${blkTotal}</span></div>`;
+    }
+
+    // ---- Layout Toggle ----
+    function switchLayout(mode) {
+        if (mode === currentLayout) return;
+        currentLayout = mode;
+        document.getElementById('btn-subgraph').classList.toggle('active', mode === 'subgraph');
+        document.getElementById('btn-linear').classList.toggle('active', mode === 'linear');
+        if (globalJsonData) renderGraph(globalJsonData);
+    }
+
+    // ---- Node Focus ----
+    function focusOnNode(nodeId) {
+        const node = cy.getElementById(nodeId);
+        if (!node.length) return;
+        cy.elements().not('.subgraph-group').addClass('faded').removeClass('highlight');
+        node.removeClass('faded').addClass('highlight');
+        node.neighborhood().not('.subgraph-group').removeClass('faded').addClass('highlight');
+        const pos = node.position();
+        cy.animate({
+            pan: {
+                x: cy.width()  / 2 - pos.x * cy.zoom(),
+                y: cy.height() / 2 - pos.y * cy.zoom()
+            },
+            duration: 400
+        });
+        node.emit('tap');
+    }
+
+    // ---- Histogram Helper ----
+    function renderHistogram(dataObj, title, colorHex) {
+        if (!dataObj) return '';
+        const entries = Object.entries(dataObj)
+            .map(([k, v]) => ({ k: parseInt(k), v }))
+            .filter(e => e.v > 0)
+            .sort((a, b) => a.k - b.k);
+        if (!entries.length) return `<div style="font-size:11px; color:#888; margin-top:8px;">${title}: No data</div>`;
+        const maxV = Math.max(...entries.map(e => e.v));
+        let html = `<div style="margin-top:12px; font-size:11px;"><strong>${title}</strong></div>
+                    <table style="width:100%; margin-top:2px; border-collapse:collapse;">`;
+        entries.forEach(e => {
+            const w = (e.v / maxV) * 100;
+            html += `<tr>
+                <td style="width:22px; text-align:right; padding-right:5px; color:#555; font-size:10px;">${e.k}</td>
+                <td><div style="display:flex; align-items:center;">
+                    <div style="flex-grow:1; background:#f0f0f0; height:12px; border-radius:2px; overflow:hidden;">
+                        <div style="width:${w}%; background:${colorHex}; height:100%;"></div>
+                    </div>
+                    <span style="font-size:10px; margin-left:5px; width:45px; text-align:right;">${e.v}</span>
+                </div></td></tr>`;
+        });
+        html += '</table>';
+        return html;
+    }
+
+    // ---- Selection Metrics ----
+    cy.on('select unselect', 'node', () => setTimeout(updateSelectionMetrics, 10));
+
+    function updateSelectionMetrics() {
+        const selected = cy.nodes(':selected').filter(n => !n.hasClass('subgraph-group') && n.id() !== 'COLD_MISS');
+        const box = document.getElementById('analysis-box');
+        if (!selected.length) { box.classList.remove('active'); return; }
+
+        let totalWeight = 0, coldWeight = 0, totalColdTraffic = 0, count = 0;
+        const dist = { intra_thread: 0, intra_instance_launch: 0, intra_warp: 0, intra_block: 0, intra_grid: 0, cold_miss: 0 };
+
+        selected.forEach(node => {
+            count++;
+            node.outgoers('edge').forEach(edge => {
+                const c = edge.data('count'), t = edge.data('type');
+                totalWeight += c;
+                if (t === 'cold_miss') {
+                    coldWeight += c; dist.cold_miss += c;
+                    const sz = edge.data('accessSize') || 4;
+                    totalColdTraffic += sz < 4 ? sz * c : (sz * c) / Math.ceil(sz / 4);
+                } else if (dist[t] !== undefined) { dist[t] += c; }
+            });
+        });
+
+        if (!count) { box.classList.remove('active'); return; }
+        box.classList.add('active');
+
+        document.getElementById('metric-intensity').innerText =
+            coldWeight > 0 ? (totalWeight / coldWeight).toFixed(2) : (totalWeight === 0 ? '0.00' : 'Inf');
+        document.getElementById('metric-nodes').innerText = count;
+        document.getElementById('metric-total').innerText = totalWeight.toLocaleString();
+        document.getElementById('metric-cold-traffic').innerText = formatBytes(totalColdTraffic);
+
+        const typeMap = [
+            { k: 'intra_thread',          l: 'Thread',          c: 'c-thread'   },
+            { k: 'intra_instance_launch', l: 'Instance Launch', c: 'c-instance' },
+            { k: 'intra_warp',            l: 'Warp',            c: 'c-warp'     },
+            { k: 'intra_block',           l: 'Block',           c: 'c-block'    },
+            { k: 'intra_grid',            l: 'Grid',            c: 'c-grid'     },
+            { k: 'cold_miss',             l: 'Cold Miss',       c: 'c-cold'     }
+        ];
+        let html = '<table class="stat-table"><tr><th>Type</th><th>Sum</th><th>%</th></tr>';
+        typeMap.forEach(t => {
+            const v = dist[t.k];
+            if (v > 0) {
+                const pct = ((v / totalWeight) * 100).toFixed(1);
+                html += `<tr><td><div class="color-box ${t.c}"></div>${t.l}</td><td>${v.toLocaleString()}</td>
+                          <td><div class="progress-bg"><div class="progress-fill ${t.c}" style="width:${pct}%"></div></div> ${pct}%</td></tr>`;
+            }
+        });
+        html += `<tr class="stat-row-total"><td>Total</td><td>${totalWeight.toLocaleString()}</td><td>100%</td></tr></table>`;
+        document.getElementById('metric-dist-content').innerHTML = html;
+    }
+
+    // ---- Graph Event Handlers ----
+    cy.on('tap', e => {
+        if (e.target !== cy) return;
+        cy.elements().removeClass('faded highlight');
+        if (!e.originalEvent.ctrlKey && !e.originalEvent.metaKey) cy.elements().unselect();
+        document.getElementById('info-panel').innerHTML = '<p>View reset.</p>';
+    });
+
+    cy.on('tap', 'node', evt => {
+        const node = evt.target;
+        if (node.hasClass('subgraph-group')) return;
+        if (evt.originalEvent.ctrlKey || evt.originalEvent.metaKey) return;
+
+        evt.stopPropagation();
+
+        cy.elements().not('.subgraph-group').addClass('faded').removeClass('highlight');
+        node.removeClass('faded').addClass('highlight');
+        node.neighborhood().not('.subgraph-group').removeClass('faded').addClass('highlight');
+
+        const pos = node.position();
+        cy.animate({
+            pan: {
+                x: cy.width()  / 2 - pos.x * cy.zoom(),
+                y: cy.height() / 2 - pos.y * cy.zoom()
+            },
+            duration: 250
+        });
+
+        if (node.id() === 'COLD_MISS') {
+            document.getElementById('info-panel').innerHTML =
+                '<strong>Untracked Memory Region</strong><br>Represents initial (first-touch) memory accesses with no prior dependency.';
+            return;
+        }
+
+        const d = node.data();
+        const flags = d.raw?.flags || '';
+        let html = `<div class="badge">PC: ${d.displayPc}</div>`;
+        if (d.isAtomic) html += ` <div class="badge atomic-badge">&#9889; ATOMIC</div>`;
+        html += `<br><strong>Flags:</strong> ${flags || '(none)'}<br>`;
+
+        if (d.isAtomic && d.contentionPct > 0) {
+            const pct = (d.contentionPct * 100).toFixed(1);
+            const cls = d.contentionPct > 0.5 ? 'contention-high' : d.contentionPct > 0.15 ? 'contention-medium' : 'contention-low';
+            const msg = d.contentionPct > 0.5 ? '&#9888; High serialization risk'
+                      : d.contentionPct > 0.15 ? '&#9889; Moderate contention'
+                      : '&#8226; Low contention';
+            html += `<div class="contention-bar ${cls}"><strong>Atomic Contention: ${pct}%</strong> inter-block/warp<br>${msg}</div>`;
+        }
+
+        if (d.access_size !== undefined) html += `<hr><div class="badge mem-badge">Access Size: ${d.access_size} bytes</div>`;
+        html += renderHistogram(d.active_lane_count,      'Active Lane Count Distribution',    '#00bcd4');
+        html += renderHistogram(d.distinct_sector_count,  'Distinct Sector Count Distribution', '#9b59b6');
+        html += renderHistogram(d.distinct_address_count, 'Distinct Address Count Distribution','#e91e63');
+
+        const outEdges = node.outgoers('edge');
+        const stats = { intra_thread: 0, intra_instance_launch: 0, intra_warp: 0, intra_block: 0, intra_grid: 0, cold_miss: 0, total: 0 };
+        outEdges.forEach(e => {
+            const t = e.data('type'), c = e.data('count');
+            if (stats[t] !== undefined) { stats[t] += c; stats.total += c; }
+        });
+
+        html += '<hr><strong>Dependency Source Summary:</strong><br>';
+        if (!stats.total) {
+            html += "<span style='color:#666'>No outgoing dependencies.</span>";
+        } else {
+            const types = [
+                { k:'intra_thread',          l:'Thread'          },
+                { k:'intra_instance_launch', l:'Instance Launch' },
+                { k:'intra_warp',            l:'Warp'            },
+                { k:'intra_block',           l:'Block'           },
+                { k:'intra_grid',            l:'Grid'            },
+                { k:'cold_miss',             l:'Cold Miss'       }
+            ];
+            html += '<table class="stat-table"><tr><th>Type</th><th>Count</th><th>%</th></tr>';
+            types.forEach(t => {
+                const v = stats[t.k];
+                if (v > 0) {
+                    const pct = ((v / stats.total) * 100).toFixed(1);
+                    const cc  = t.k === 'cold_miss' ? 'c-cold'
+                               : t.k === 'intra_instance_launch' ? 'c-instance'
+                               : 'c-' + t.k.replace('intra_', '');
+                    html += `<tr><td><div class="color-box ${cc}"></div>${t.l}</td><td>${v.toLocaleString()}</td>
+                              <td><div class="progress-bg"><div class="progress-fill ${cc}" style="width:${pct}%"></div></div> ${pct}%</td></tr>`;
+                }
+            });
+            html += `<tr class="stat-row-total"><td>Total</td><td>${stats.total.toLocaleString()}</td><td>100%</td></tr></table>`;
+        }
+        document.getElementById('info-panel').innerHTML = html;
+    });
+
+    cy.on('tap', 'edge', evt => {
+        evt.stopPropagation();
+        const d = evt.target.data();
+        const cc = d.type === 'cold_miss'             ? 'c-cold'
+                 : d.type === 'intra_instance_launch' ? 'c-instance'
+                 : 'c-' + d.type.replace('intra_', '');
+        let html = '<strong>Edge Details</strong><br>';
+        html += `<div style="display:flex; align-items:center; margin:8px 0; font-size:13px;">
+                    <div class="color-box ${cc}" style="width:14px; height:14px;"></div>
+                    <strong>${d.type.toUpperCase().replace(/_/g, ' ')}</strong>
+                 </div>`;
+        if (d.accessSize !== undefined)
+            html += `<div class="badge mem-badge" style="margin-bottom:10px;">Access Size: ${d.accessSize} bytes</div>`;
+        html += `<table class="stat-table">
+            <tr><td>Count</td><td><strong>${d.countFmt}</strong></td></tr>
+            <tr><td colspan="2" style="font-weight:bold; color:#555; padding-top:6px;">Within this PC pair</td></tr>
+            <tr><td>Pair Total</td><td>${d.pairTotal.toLocaleString()}</td></tr>
+            <tr><td><strong>Type Share</strong></td>
+                <td><div class="progress-bg"><div class="progress-fill ${cc}" style="width:${d.pairPct}%"></div></div> <strong>${d.pairPct}%</strong></td></tr>
+            <tr><td colspan="2" style="font-weight:bold; color:#555; padding-top:6px;">Within destination node</td></tr>
+            <tr><td>Node Total</td><td>${d.nodeTotal.toLocaleString()}</td></tr>
+            <tr><td><strong>Global Impact</strong></td>
+                <td><div class="progress-bg"><div class="progress-fill ${cc}" style="width:${d.nodePct}%"></div></div> <strong>${d.nodePct}%</strong></td></tr>
+        </table>
+        <hr><div style="font-size:11px; color:#666;">Source: ${d.source}<br>Target: ${d.target}</div>`;
+        document.getElementById('info-panel').innerHTML = html;
+    });
+
+    function toggleAccordion(header) {
+        header.parentElement.classList.toggle('active');
+    }
+</script>
+</body>
+</html>
