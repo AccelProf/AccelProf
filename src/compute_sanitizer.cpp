@@ -87,7 +87,7 @@ void LoadKernelWhiteList(const char* whitelist_path) {
     std::string line;
     while (std::getline(fin, line)) {
         trim(line);
-        if (line.empty() || line[0] == '#') continue;  // 跳过空行与注释
+        if (line.empty() || line[0] == '#') continue;  // skip empty lines or comments
         sanitizer_kernel_white_list.insert(line);
     }
 
