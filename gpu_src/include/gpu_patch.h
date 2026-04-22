@@ -26,7 +26,7 @@ struct MemoryAccess
     uint64_t ctaId;
     uint64_t pc;
     uint32_t warpId;
-    uint32_t distinct_sector_count;
+    uint32_t distinct_sector_count;    // for pc_dependency_analysis tool
     uint32_t active_mask;
     uint32_t unique_address_mask;
     MemoryType type;
