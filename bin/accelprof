@@ -321,5 +321,5 @@ fi
 end_time=$(date +%s%N)
 elapsed_ms=$(( (end_time - start_time) / 1000000 ))
 printf "%-30s: %s\n" "[ACCELPROF INFO] END TIME" "$(date)" >> ${OUTPUT_REDIRECT}
-printf "%-30s: %02d:%02d:%02d.%03d\n" "[ACCELPROF INFO] ELAPSED TIME" \
+printf "%-30s: %02d:%02d:%02d\n" "[ACCELPROF INFO] ELAPSED TIME" \```
         $((elapsed_ms/3600000)) $((elapsed_ms%3600000/60000)) $((elapsed_ms%60000/1000)) $((elapsed_ms%1000)) >> ${OUTPUT_REDIRECT}
