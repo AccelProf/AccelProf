@@ -1,19 +1,9 @@
 *.fatbin
 *.so
-*.log
 run.sh
-./benchmark_overhead.sh
-./setup_env.sh
-
 
 .vscode/
-example/
 test/
 lib/
 obj/
 build/
-third_party/pc_dependency_gui/previous_version/
-third_party/libbacktrace/
-third_party/pybind11/
-paper/
-pdfs/

@@ -14,18 +14,12 @@ Description: A collection of CUDA application profilers.
 Usage:
     -h, --help
         Print this help message.
-    -p, --perf
-        Enable Linux perf (perf record -g) together with accelprof.
-        Perf data will be saved to <RESULT_DIR>/<app_name>.perf.data.
     -t <tool_name>
         none: Do nothing.
         mem_trace: Trace memory access of CUDA kernels.
         app_metric: Collect metrics for CUDA Applications.
         code_check: Check CUDA code for potential issues.
         hot_analysis: Analyze hot memory regions.
-        heatmap_analysis: Analyze heatmap of memory access.
-        block_divergence_analysis: Analyze block divergence of memory access.
-        pc_dependency_analysis: Analyze PC dependency of memory access.
         app_analysis: Analyze CUDA application performance.
         app_analysis_cpu: Analyze CUDA application performance on CPU.
         time_hotness_cpu: Analyze time hotness on CPU.
@@ -38,15 +32,6 @@ Usage:
             - nvc (NVIDIA Compute Sanitizer, default)
             - nvbit (NVIDIA nvbit)
             - rocm (AMD ROCm)
-    -b heatmap_analysis target block in x,y,z format.
-    -o <output_directory>
-        Specify the output directory for results.
-    -w kernel_whitelist_file
-        Specify the kernel whitelist file.
-            - Example: ./kernel_whitelist.txt (each line in the file is a kernel name)
-    -n <num_workers>
-        Specify the number of worker threads for pc_dependency_analysis.
-        Defaults to the number of hardware threads if not set.
     -v
         Verbose mode.
 EOF
@@ -71,10 +56,6 @@ while [ -n "$1" ]
 do
     arg="$1" ; shift
     case "${arg}" in
-        -p|--perf)
-        export ENABLE_LINUX_PERF=1
-        OPTION_STR="${OPTION_STR} --perf"
-        ;;
         -t)
         export TOOL=$1
         shift
@@ -93,32 +74,13 @@ do
         help_func
         break
         ;;
-        -b)
-        export TARGET_BLOCK=$1
-        shift
-        OPTION_STR="${OPTION_STR} -b ${TARGET_BLOCK}"
-        ;;
-        -o)
-        export RESULT_DIR=$1
-        shift
-        OPTION_STR="${OPTION_STR} -o ${RESULT_DIR}"
-        ;;
-        -w)
-        export KERNEL_WHITELIST_FILE=$1
-        shift
-        OPTION_STR="${OPTION_STR} -w ${KERNEL_WHITELIST_FILE}"
-        ;;
-        -n)
-        export YOSEMITE_WORKER_COUNT=$1
-        shift
-        OPTION_STR="${OPTION_STR} -n ${YOSEMITE_WORKER_COUNT}"
-        ;;
         * )
         set -- "${arg}" "$@"
         break
         ;;
     esac
 done
+
 EXECUTABLE=$1
 ARGS="${*:2}"
 
@@ -168,11 +130,6 @@ else
     export OUTPUT_REDIRECT=/dev/null
 fi
 
-if [ ! -z ${KERNEL_WHITELIST_FILE} ]
-then
-    export YOSEMITE_KERNEL_WHITELIST=${KERNEL_WHITELIST_FILE}
-fi
-
 # Profile the application with the specified tool
 if [ ${TOOL} == "code_check" ]
 then
@@ -213,19 +170,6 @@ then
 elif [ ${TOOL} == "event_trace_mgpu" ]
 then
     export YOSEMITE_TOOL_NAME=event_trace_mgpu
-elif [ ${TOOL} == "heatmap_analysis" ]
-then
-    export YOSEMITE_TOOL_NAME=heatmap_analysis
-    if [ ! -z ${TARGET_BLOCK} ]
-    then
-        export YOSEMITE_TARGET_BLOCK=${TARGET_BLOCK}
-    fi
-elif [ ${TOOL} == "block_divergence_analysis" ]
-then
-    export YOSEMITE_TOOL_NAME=block_divergence_analysis
-elif [ ${TOOL} == "pc_dependency_analysis" ]
-then
-    export YOSEMITE_TOOL_NAME=pc_dependency_analysis
 elif [ ${TOOL} == "none" ]
 then
     export YOSEMITE_TOOL_NAME=none
@@ -252,11 +196,6 @@ printf "%-30s: %s\n" "[ACCELPROF INFO] OPTIONS" \
         "${OPTION_STR}" >> ${OUTPUT_REDIRECT}
 printf "%-30s: %s %s\n" "[ACCELPROF INFO] COMMAND" \
         "${EXECUTABLE}" "${ARGS}" >> ${OUTPUT_REDIRECT}
-if [ "${ENABLE_LINUX_PERF}" = "1" ]; then
-    PERF_OUTPUT=${RESULT_DIR}/${YOSEMITE_APP_NAME}.perf.data
-    printf "%-30s: %s\n" "[ACCELPROF INFO] PERF" \
-        "enabled (perf record -g -o ${PERF_OUTPUT})" >> ${OUTPUT_REDIRECT}
-fi
 
 # Record start time in seconds since epoch
 start_time=$(date +%s)
@@ -287,25 +226,9 @@ fi
 if [ "${MGPU_PROFILING}" == "1" ]
 then
     export TORCH_PROFILE_ENABLED=1
-    if [ "${ENABLE_LINUX_PERF}" = "1" ]; then
-        if ! command -v perf >/dev/null 2>&1; then
-            error_hint "Linux perf is enabled, but 'perf' is not found in PATH."
-        fi
-        perf record --call-graph dwarf -F 99 -g -o "${PERF_OUTPUT}" -- env CUDA_INJECTION64_PATH=${LD_PRELOAD_LIB} \
-            ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
-    else
-        CUDA_INJECTION64_PATH=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
-    fi
+    CUDA_INJECTION64_PATH=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
 else
-    if [ "${ENABLE_LINUX_PERF}" = "1" ]; then
-        if ! command -v perf >/dev/null 2>&1; then
-            error_hint "Linux perf is enabled, but 'perf' is not found in PATH."
-        fi
-        perf record --call-graph dwarf -F 99 -g -o "${PERF_OUTPUT}" -- env LD_PRELOAD=${LD_PRELOAD_LIB} \
-            ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
-    else
-        LD_PRELOAD=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
-    fi
+    LD_PRELOAD=${LD_PRELOAD_LIB} ${EXECUTABLE} ${ARGS} >> ${OUTPUT_REDIRECT} 2>&1
 fi
 
 
@@ -321,5 +244,5 @@ fi
 end_time=$(date +%s)
 elapsed=$((end_time - start_time))
 printf "%-30s: %s\n" "[ACCELPROF INFO] END TIME" "$(date)" >> ${OUTPUT_REDIRECT}
-printf "%-30s: %02d:%02d:%02d\n" "[ACCELPROF INFO] ELAPSED TIME" \```
+printf "%-30s: %02d:%02d:%02d\n" "[ACCELPROF INFO] ELAPSED TIME" \
         $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60)) >> ${OUTPUT_REDIRECT}
