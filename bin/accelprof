@@ -317,7 +317,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Record end time and calculate elapsed time in milliseconds
+# Record end time and calculate elapsed time
 end_time=$(date +%s%N)
 elapsed_ms=$(( (end_time - start_time) / 1000000 ))
 printf "%-30s: %s\n" "[ACCELPROF INFO] END TIME" "$(date)" >> ${OUTPUT_REDIRECT}
