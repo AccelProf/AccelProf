@@ -259,7 +259,7 @@ if [ "${ENABLE_LINUX_PERF}" = "1" ]; then
 fi
 
 # Record start time in seconds since epoch
-start_time=$(date +%s%N)
+start_time=$(date +%s)
 printf "%-30s: %s\n\n" "[ACCELPROF INFO] START TIME" "$(date)" >> ${OUTPUT_REDIRECT}
 
 # accelprof
