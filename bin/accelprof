@@ -319,7 +319,7 @@ fi
 
 # Record end time and calculate elapsed time
 end_time=$(date +%s)
-elapsed_ms=$(( (end_time - start_time) / 1000000 ))
+elapsed=$((end_time - start_time))
 printf "%-30s: %s\n" "[ACCELPROF INFO] END TIME" "$(date)" >> ${OUTPUT_REDIRECT}
 printf "%-30s: %02d:%02d:%02d\n" "[ACCELPROF INFO] ELAPSED TIME" \```
         $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60)) >> ${OUTPUT_REDIRECT}
