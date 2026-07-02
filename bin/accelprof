@@ -258,7 +258,7 @@ if [ "${ENABLE_LINUX_PERF}" = "1" ]; then
         "enabled (perf record -g -o ${PERF_OUTPUT})" >> ${OUTPUT_REDIRECT}
 fi
 
-# Record start time in milliseconds since epoch
+# Record start time in seconds since epoch
 start_time=$(date +%s%N)
 printf "%-30s: %s\n\n" "[ACCELPROF INFO] START TIME" "$(date)" >> ${OUTPUT_REDIRECT}
 
