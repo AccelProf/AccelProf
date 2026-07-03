@@ -16,6 +16,8 @@
 #include <cstring>
 #include <cassert>
 #include <unordered_map>
+#include <unordered_set>
+#include <sstream>
 
 #define SANITIZER_VERBOSE 1
 
@@ -58,6 +60,55 @@ static std::unordered_map<CUmodule, bool> sanitizer_active_modules;
 // <context, device> for multi-GPU support
 static std::unordered_map<CUcontext, CUdevice> sanitizer_ctx_to_device;
 
+static std::unordered_set<std::string> sanitizer_kernel_white_list;
+
+// read whitelist file, parse kernel keywords line by line
+void LoadKernelWhiteList(const char* whitelist_path) {
+    if (!whitelist_path) return;
+
+    std::ifstream fin(whitelist_path);
+    if (!fin.is_open()) {
+        std::cerr << "[SANITIZER WARN] Failed to open whitelist file: "
+                  << whitelist_path << std::endl;
+        return;
+    }
+
+    auto trim = [](std::string& s) {
+        const char* ws = " \t\r\n";
+        auto start = s.find_first_not_of(ws);
+        if (start == std::string::npos) {
+            s.clear();
+            return;
+        }
+        auto end = s.find_last_not_of(ws);
+        s = s.substr(start, end - start + 1);
+    };
+
+    std::string line;
+    while (std::getline(fin, line)) {
+        trim(line);
+        if (line.empty() || line[0] == '#') continue;  // skip empty lines or comments
+        sanitizer_kernel_white_list.insert(line);
+    }
+
+    PRINT("[SANITIZER INFO] Loaded %zu kernel whitelist entries from %s\n",
+          sanitizer_kernel_white_list.size(), whitelist_path);
+    if (!sanitizer_kernel_white_list.empty()) {
+        PRINT("[SANITIZER INFO] Kernel whitelist: %s\n", sanitizer_kernel_white_list.begin()->c_str());
+    }
+}
+
+bool SanitizerKernelWhiteListCheck(const std::string& functionName){
+    if (sanitizer_kernel_white_list.empty()) {
+        return true;
+    }
+    for (const auto& kernel : sanitizer_kernel_white_list) {
+        if (functionName.find(kernel) != std::string::npos) {
+            return true;
+        }
+    }
+    return false;
+}
 
 void SanitizerTensorMallocCallback(uint64_t ptr, int64_t size, int64_t allocated, int64_t reserved, int device_id) {
     if (!sanitizer_options.sanitizer_callback_enabled) {
@@ -107,9 +158,9 @@ void ModuleUnloadedCallback(CUmodule module) {
 
     auto it = sanitizer_active_modules.find(module);
     assert(it != sanitizer_active_modules.end());
-    if (it->second) {   // unpatch if module is patched
-        SANITIZER_SAFECALL(sanitizerUnpatchModule(module));
-    }
+    // if (it->second) {   // unpatch if module is patched
+    //     SANITIZER_SAFECALL(sanitizerUnpatchModule(module));
+    // }
     sanitizer_active_modules.erase(it);
 }
 
@@ -192,6 +243,45 @@ void ModuleLoadedCallback(CUmodule module)
         SANITIZER_SAFECALL(
             sanitizerPatchInstructions(
                 SANITIZER_INSTRUCTION_GLOBAL_MEMORY_ACCESS, module, "MemoryGlobalAccessCallback"));
+        SANITIZER_SAFECALL(
+            sanitizerPatchInstructions(SANITIZER_INSTRUCTION_BLOCK_EXIT, module, "BlockExitCallback"));
+    } else if (sanitizer_options.patch_name == GPU_PATCH_HEATMAP_ANALYSIS) {
+        SANITIZER_SAFECALL(
+            sanitizerPatchInstructions(
+                SANITIZER_INSTRUCTION_GLOBAL_MEMORY_ACCESS, module, "MemoryGlobalAccessCallback"));
+        SANITIZER_SAFECALL(
+            sanitizerPatchInstructions(
+                SANITIZER_INSTRUCTION_SHARED_MEMORY_ACCESS, module, "MemorySharedAccessCallback"));
+        SANITIZER_SAFECALL(
+            sanitizerPatchInstructions(
+                SANITIZER_INSTRUCTION_LOCAL_MEMORY_ACCESS, module, "MemoryLocalAccessCallback"));
+        // SANITIZER_SAFECALL(
+        //     sanitizerPatchInstructions(
+        //         SANITIZER_INSTRUCTION_MEMCPY_ASYNC, module, "MemcpyAsyncCallback"));
+        SANITIZER_SAFECALL(
+            sanitizerPatchInstructions(SANITIZER_INSTRUCTION_BLOCK_EXIT, module, "BlockExitCallback"));
+    } else if (sanitizer_options.patch_name == GPU_PATCH_BLOCK_DIVERGENCE_ANALYSIS) {
+        SANITIZER_SAFECALL(
+            sanitizerPatchInstructions(
+                SANITIZER_INSTRUCTION_GLOBAL_MEMORY_ACCESS, module, "MemoryGlobalAccessCallback"));
+        SANITIZER_SAFECALL(
+            sanitizerPatchInstructions(
+                SANITIZER_INSTRUCTION_SHARED_MEMORY_ACCESS, module, "MemorySharedAccessCallback"));
+        SANITIZER_SAFECALL(
+            sanitizerPatchInstructions(
+                SANITIZER_INSTRUCTION_LOCAL_MEMORY_ACCESS, module, "MemoryLocalAccessCallback"));
+        SANITIZER_SAFECALL(
+            sanitizerPatchInstructions(SANITIZER_INSTRUCTION_BLOCK_EXIT, module, "BlockExitCallback"));
+    } else if (sanitizer_options.patch_name == GPU_PATCH_PC_DEPENDENCY_ANALYSIS) {
+        SANITIZER_SAFECALL(
+            sanitizerPatchInstructions(
+                SANITIZER_INSTRUCTION_GLOBAL_MEMORY_ACCESS, module, "MemoryGlobalAccessCallback"));
+        SANITIZER_SAFECALL(
+            sanitizerPatchInstructions(
+                SANITIZER_INSTRUCTION_SHARED_MEMORY_ACCESS, module, "MemorySharedAccessCallback"));
+        SANITIZER_SAFECALL(
+            sanitizerPatchInstructions(
+                SANITIZER_INSTRUCTION_LOCAL_MEMORY_ACCESS, module, "MemoryLocalAccessCallback"));
         SANITIZER_SAFECALL(
             sanitizerPatchInstructions(SANITIZER_INSTRUCTION_BLOCK_EXIT, module, "BlockExitCallback"));
     }
@@ -313,6 +403,63 @@ void buffer_init(CUcontext context) {
             SANITIZER_SAFECALL(
                 sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell)));
         }
+    } else if (sanitizer_options.patch_name == GPU_PATCH_HEATMAP_ANALYSIS) {
+        if (!device_access_buffer) {
+            SANITIZER_SAFECALL(
+                sanitizerAlloc(
+                    context,
+                    (void**)&device_access_buffer,
+                    sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE));
+        }
+        if (!host_access_buffer) {
+            SANITIZER_SAFECALL(
+                sanitizerAllocHost(
+                    context,
+                    (void**)&host_access_buffer,
+                    sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE));
+        }
+        if (!global_doorbell) {
+            SANITIZER_SAFECALL(
+                sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell)));
+        }
+    } else if (sanitizer_options.patch_name == GPU_PATCH_BLOCK_DIVERGENCE_ANALYSIS) {
+        if (!device_access_buffer) {
+            SANITIZER_SAFECALL(
+                sanitizerAlloc(
+                    context,
+                    (void**)&device_access_buffer,
+                    sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE));
+        }
+        if (!host_access_buffer) {
+            SANITIZER_SAFECALL(
+                sanitizerAllocHost(
+                    context,
+                    (void**)&host_access_buffer,
+                    sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE));
+        }
+        if (!global_doorbell) {
+            SANITIZER_SAFECALL(
+                sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell)));
+        }
+    } else if (sanitizer_options.patch_name == GPU_PATCH_PC_DEPENDENCY_ANALYSIS) {
+        if (!device_access_buffer) {
+            SANITIZER_SAFECALL(
+                sanitizerAlloc(
+                    context,
+                    (void**)&device_access_buffer,
+                    sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE));
+        }
+        if (!host_access_buffer) {
+            SANITIZER_SAFECALL(
+                sanitizerAllocHost(
+                    context,
+                    (void**)&host_access_buffer,
+                    sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE));
+        }
+        if (!global_doorbell) {
+            SANITIZER_SAFECALL(
+                sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell)));
+        }
     }
 }
 
@@ -321,15 +468,19 @@ void LaunchBeginCallback(
     CUcontext context,
     CUmodule module,
     CUfunction function,
+    uint64_t pc,
     std::string functionName,
     Sanitizer_StreamHandle hstream,
     dim3 blockDims,
     dim3 gridDims)
 {
+    bool launch_monitoring = true;
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
         // sampling
         sanitizer_options.grid_launch_id++;
-        if (sanitizer_options.grid_launch_id % sanitizer_options.sample_rate == 0) {
+        if ((sanitizer_options.grid_launch_id % sanitizer_options.sample_rate == 0) &&
+            SanitizerKernelWhiteListCheck(functionName)) {
+            
             PRINT("[SANITIZER INFO] Monitoring kernel %s, launch id %lu\n",
                     functionName.c_str(), sanitizer_options.grid_launch_id);
             auto it = sanitizer_active_modules.find(module);
@@ -340,12 +491,15 @@ void LaunchBeginCallback(
         } else {
             PRINT("[SANITIZER INFO] Skipping kernel %s monitoring, launch id %lu\n",
                     functionName.c_str(), sanitizer_options.grid_launch_id);
-            auto it = sanitizer_active_modules.find(module);
-            if (it->second) {
-                SANITIZER_SAFECALL(sanitizerUnpatchModule(module));
-                it->second = false;
-            }
-            return;
+            launch_monitoring = false;
+            // auto it = sanitizer_active_modules.find(module);
+            // if (it != sanitizer_active_modules.end()) {
+            //     if (it->second) {
+            //         // SANITIZER_SAFECALL(sanitizerUnpatchModule(module));
+            //         it->second = false;
+            //     }
+            //     return;
+            // }
         }
 
         buffer_init(context);
@@ -444,8 +598,77 @@ void LaunchBeginCallback(
             global_doorbell->num_threads = num_threads;
             global_doorbell->full = 0;
             host_tracker_handle->doorBell = global_doorbell;
+        } else if (sanitizer_options.patch_name == GPU_PATCH_HEATMAP_ANALYSIS) {
+            SANITIZER_SAFECALL(
+                sanitizerMemset(
+                    device_access_buffer, 0, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, hstream));
+            host_tracker_handle->currentEntry = 0;
+            host_tracker_handle->numEntries = 0;
+            host_tracker_handle->access_buffer = device_access_buffer;
+            char* target_block_str = std::getenv("YOSEMITE_TARGET_BLOCK");
+            if (target_block_str) {
+                // target_block_str is "x,y,z"
+                std::stringstream ss(target_block_str);
+                std::string token;
+                int i = 0;
+                while (std::getline(ss, token, ',')) {
+                    host_tracker_handle->target_block[i] = std::stoi(token);
+                    i++;
+                }
+                if (i != 3) {
+                    PRINT("[SANITIZER ERROR] Invalid target block format: %s\n", target_block_str);
+                    exit(EXIT_FAILURE);
+                }
+                if (host_tracker_handle->target_block[0] < 0 || host_tracker_handle->target_block[1] < 0 || host_tracker_handle->target_block[2] < 0) {
+                    PRINT("[SANITIZER ERROR] Invalid target block: %d, %d, %d\n", host_tracker_handle->target_block[0], host_tracker_handle->target_block[1], host_tracker_handle->target_block[2]);
+                    exit(EXIT_FAILURE);
+                }
+                if (host_tracker_handle->target_block[0] >= gridDims.x || host_tracker_handle->target_block[1] >= gridDims.y || host_tracker_handle->target_block[2] >= gridDims.z) {
+                    PRINT("[SANITIZER ERROR] Invalid target block: %d, %d, %d\n", host_tracker_handle->target_block[0], host_tracker_handle->target_block[1], host_tracker_handle->target_block[2]);
+                    exit(EXIT_FAILURE);
+                }
+                PRINT("[SANITIZER INFO] Target block: %d, %d, %d\n", host_tracker_handle->target_block[0], host_tracker_handle->target_block[1], host_tracker_handle->target_block[2]);
+            } else {
+                host_tracker_handle->target_block[0] = 0;
+                host_tracker_handle->target_block[1] = 0;
+                host_tracker_handle->target_block[2] = 0;
+                PRINT("[SANITIZER INFO] No target block specified, using default (0, 0, 0)\n");
+            }
+            // only sample one block so the doorbell need to be updated to thread amount of one block
+            uint32_t num_threads = blockDims.x * blockDims.y * blockDims.z;
+            global_doorbell->num_threads = num_threads;
+            global_doorbell->full = 0;
+            host_tracker_handle->doorBell = global_doorbell;
+        } else if (sanitizer_options.patch_name == GPU_PATCH_BLOCK_DIVERGENCE_ANALYSIS) {
+            SANITIZER_SAFECALL(
+                sanitizerMemset(
+                    device_access_buffer, 0, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, hstream));
+            host_tracker_handle->currentEntry = 0;
+            host_tracker_handle->numEntries = 0;
+            host_tracker_handle->access_buffer = device_access_buffer;
+
+            uint32_t num_threads =
+                        blockDims.x * blockDims.y * blockDims.z * gridDims.x * gridDims.y * gridDims.z;
+            global_doorbell->num_threads = num_threads;
+            global_doorbell->full = 0;
+            host_tracker_handle->doorBell = global_doorbell;
+        } else if (sanitizer_options.patch_name == GPU_PATCH_PC_DEPENDENCY_ANALYSIS) {
+            SANITIZER_SAFECALL(
+                sanitizerMemset(
+                    device_access_buffer, 0, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, hstream));
+            host_tracker_handle->currentEntry = 0;
+            host_tracker_handle->numEntries = 0;
+            host_tracker_handle->access_buffer = device_access_buffer;
+
+            uint32_t num_threads =
+                        blockDims.x * blockDims.y * blockDims.z * gridDims.x * gridDims.y * gridDims.z;
+            global_doorbell->num_threads = num_threads;
+            global_doorbell->full = 0;
+            host_tracker_handle->doorBell = global_doorbell;
         }
 
+        host_tracker_handle->kernel_pc = pc; // for in-gpu offset calculation
+        host_tracker_handle->enabled_instrumenting = launch_monitoring;
         SANITIZER_SAFECALL(
             sanitizerMemcpyHostToDeviceAsync(
                 device_tracker_handle, host_tracker_handle, sizeof(MemoryAccessTracker), hstream));
@@ -453,7 +676,11 @@ void LaunchBeginCallback(
     }
 
     int device_id = sanitizer_ctx_to_device[context];
-    yosemite_kernel_start_callback(functionName, device_id);
+    if(launch_monitoring) {
+        yosemite_kernel_start_callback(
+            functionName, device_id, gridDims.x, gridDims.y, gridDims.z, blockDims.x, blockDims.y, blockDims.z
+        );
+    }
 }
 
 
@@ -466,7 +693,8 @@ void LaunchEndCallback(
     Sanitizer_StreamHandle phstream)
 {
     // sampling
-    if (sanitizer_options.grid_launch_id % sanitizer_options.sample_rate != 0) {
+    if (sanitizer_options.grid_launch_id % sanitizer_options.sample_rate != 0 ||
+        !SanitizerKernelWhiteListCheck(functionName)) {
         return;
     }
 
@@ -617,6 +845,90 @@ void LaunchEndCallback(
                     host_access_buffer, device_access_buffer, sizeof(MemoryAccess) * numEntries, hstream));
 
             yosemite_gpu_data_analysis(host_access_buffer, numEntries);
+        } else if (sanitizer_options.patch_name == GPU_PATCH_HEATMAP_ANALYSIS) {
+            while (true)
+            {
+                if (global_doorbell->num_threads == 0) {
+                    break;
+                }
+
+                if (global_doorbell->full) {
+                    PRINT("[SANITIZER INFO] Doorbell full with size %u. Analyzing data...\n",
+                                                                            MEMORY_ACCESS_BUFFER_SIZE);
+                    SANITIZER_SAFECALL(
+                        sanitizerMemcpyDeviceToHost(host_access_buffer, device_access_buffer,
+                                            sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, phstream));
+                    yosemite_gpu_data_analysis(host_access_buffer, MEMORY_ACCESS_BUFFER_SIZE);
+                    global_doorbell->full = 0;
+                }
+            }
+            SANITIZER_SAFECALL(sanitizerStreamSynchronize(hstream));
+            SANITIZER_SAFECALL(
+                sanitizerMemcpyDeviceToHost(
+                    host_tracker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream));
+
+            auto numEntries = host_tracker_handle->numEntries;
+            SANITIZER_SAFECALL(
+                sanitizerMemcpyDeviceToHost(
+                    host_access_buffer, device_access_buffer, sizeof(MemoryAccess) * numEntries, hstream));
+
+            yosemite_gpu_data_analysis(host_access_buffer, numEntries);
+        } else if (sanitizer_options.patch_name == GPU_PATCH_BLOCK_DIVERGENCE_ANALYSIS) {
+            while (true)
+            {
+                if (global_doorbell->num_threads == 0) {
+                    break;
+                }
+
+                if (global_doorbell->full) {
+                    PRINT("[SANITIZER INFO] Doorbell full with size %u. Analyzing data...\n",
+                                                                            MEMORY_ACCESS_BUFFER_SIZE);
+                    SANITIZER_SAFECALL(
+                        sanitizerMemcpyDeviceToHost(host_access_buffer, device_access_buffer,
+                                            sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, phstream));
+                    yosemite_gpu_data_analysis(host_access_buffer, MEMORY_ACCESS_BUFFER_SIZE);
+                    global_doorbell->full = 0;
+                }
+            }
+            SANITIZER_SAFECALL(sanitizerStreamSynchronize(hstream));
+            SANITIZER_SAFECALL(
+                sanitizerMemcpyDeviceToHost(
+                    host_tracker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream));
+
+            auto numEntries = host_tracker_handle->numEntries;
+            SANITIZER_SAFECALL(
+                sanitizerMemcpyDeviceToHost(
+                    host_access_buffer, device_access_buffer, sizeof(MemoryAccess) * numEntries, hstream));
+
+            yosemite_gpu_data_analysis(host_access_buffer, numEntries);
+        } else if (sanitizer_options.patch_name == GPU_PATCH_PC_DEPENDENCY_ANALYSIS) {
+            while (true)
+            {
+                if (global_doorbell->num_threads == 0) {
+                    break;
+                }
+
+                if (global_doorbell->full) {
+                    PRINT("[SANITIZER INFO] Doorbell full with size %u. Analyzing data...\n",
+                                                                            MEMORY_ACCESS_BUFFER_SIZE);
+                    SANITIZER_SAFECALL(
+                        sanitizerMemcpyDeviceToHost(host_access_buffer, device_access_buffer,
+                                            sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, phstream));
+                    yosemite_gpu_data_analysis(host_access_buffer, MEMORY_ACCESS_BUFFER_SIZE);
+                    global_doorbell->full = 0;
+                }
+            }
+            SANITIZER_SAFECALL(sanitizerStreamSynchronize(hstream));
+            SANITIZER_SAFECALL(
+                sanitizerMemcpyDeviceToHost(
+                    host_tracker_handle, device_tracker_handle, sizeof(MemoryAccessTracker), hstream));
+
+            auto numEntries = host_tracker_handle->numEntries;
+            SANITIZER_SAFECALL(
+                sanitizerMemcpyDeviceToHost(
+                    host_access_buffer, device_access_buffer, sizeof(MemoryAccess) * numEntries, hstream));
+
+            yosemite_gpu_data_analysis(host_access_buffer, numEntries);
         }
     } else {
         SANITIZER_SAFECALL(sanitizerStreamSynchronize(hstream));
@@ -679,6 +991,12 @@ void ComputeSanitizerCallback(
                     auto* pContextData = (Sanitizer_ResourceContextData*)cbdata;
                     PRINT("[SANITIZER INFO] Context %p creation finished on device %p\n",
                             &pContextData->context, &pContextData->device);
+
+                    CUstream p_stream;
+                    Sanitizer_StreamHandle p_stream_handle;
+                    sanitizer_priority_stream_get(pContextData->context, &p_stream);
+                    PRINT("[SANITIZER INFO] Priority stream %p created on context %p\n",
+                            p_stream, pContextData->context);
                     break;
                 }
                 case SANITIZER_CBID_RESOURCE_CONTEXT_DESTROY_STARTING:
@@ -728,7 +1046,7 @@ void ComputeSanitizerCallback(
 
                     PRINT("[SANITIZER INFO] Malloc memory %p with size %lu (flag: %u) on device %d\n",
                             (void*)pModuleData->address, pModuleData->size, pModuleData->flags, device_id);
-
+                    PRINT("[SANITIZER INFO] Sector tag: %p, end tag: %p\n", (void*)(pModuleData->address >> 5), (void*)((pModuleData->address + pModuleData->size - 1) >> 5));
                     yosemite_alloc_callback(
                             pModuleData->address, pModuleData->size, pModuleData->flags, device_id);
                     break;
@@ -742,6 +1060,64 @@ void ComputeSanitizerCallback(
                     CUdevice device_id = sanitizer_ctx_to_device[pModuleData->context];
 
                     PRINT("[SANITIZER INFO] Free memory %p with size %lu (flag: %u) on device %d\n",
+                            (void*)pModuleData->address, pModuleData->size, pModuleData->flags, device_id);
+
+                    yosemite_free_callback(
+                            pModuleData->address, pModuleData->size, pModuleData->flags, device_id);
+                    break;
+                }
+                case SANITIZER_CBID_RESOURCE_HOST_MEMORY_ALLOC:
+                {
+                    auto *pModuleData = (Sanitizer_ResourceMemoryData *)cbdata;
+                    if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0) {
+                        break;
+                    }
+                    PRINT("[SANITIZER INFO] Alloc host memory %p with size %lu (flag: %u)\n",
+                            (void*)pModuleData->address, pModuleData->size, pModuleData->flags);
+                    PRINT("[SANITIZER INFO] Sector tag: %p, end tag: %p\n", (void*)(pModuleData->address >> 5), (void*)((pModuleData->address + pModuleData->size - 1) >> 5));
+                    yosemite_alloc_callback(
+                            pModuleData->address, pModuleData->size, pModuleData->flags, 0);
+                    break;
+                }
+                case SANITIZER_CBID_RESOURCE_HOST_MEMORY_FREE:
+                {
+                    auto *pModuleData = (Sanitizer_ResourceMemoryData *)cbdata;
+                    if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0) {
+                        break;
+                    }
+                    
+                    PRINT("[SANITIZER INFO] Free host memory %p with size %lu (flag: %u)\n",
+                            (void*)pModuleData->address, pModuleData->size, pModuleData->flags);
+
+                    yosemite_free_callback(
+                            pModuleData->address, pModuleData->size, pModuleData->flags, 0);
+                    break;
+                }
+                case SANITIZER_CBID_RESOURCE_MEMORY_ALLOC_ASYNC:
+                {
+                    auto* pModuleData = (Sanitizer_ResourceMemoryData*)cbdata;
+                    if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0) {
+                        break;
+                    }
+
+                    CUdevice device_id = sanitizer_ctx_to_device[pModuleData->context];
+
+                    PRINT("[SANITIZER INFO] Alloc async memory %p with size %lu (flag: %u) on device %d\n",
+                            (void*)pModuleData->address, pModuleData->size, pModuleData->flags, device_id);
+                    yosemite_alloc_callback(
+                            pModuleData->address, pModuleData->size, pModuleData->flags, device_id);
+                    break;
+                }
+                case SANITIZER_CBID_RESOURCE_MEMORY_FREE_ASYNC:
+                {
+                    auto* pModuleData = (Sanitizer_ResourceMemoryData*)cbdata;
+                    if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0) {
+                        break;
+                    }
+
+                    CUdevice device_id = sanitizer_ctx_to_device[pModuleData->context];
+
+                    PRINT("[SANITIZER INFO] Free async memory %p with size %lu (flag: %u) on device %d\n",
                             (void*)pModuleData->address, pModuleData->size, pModuleData->flags, device_id);
 
                     yosemite_free_callback(
@@ -768,14 +1144,16 @@ void ComputeSanitizerCallback(
                     auto func_name = sanitizer_demangled_name_get(pLaunchData->functionName);
 
                     CUdevice device_id = sanitizer_ctx_to_device[pLaunchData->context];
-
-                    PRINT("[SANITIZER INFO] Launching kernel %s <<<(%u, %u, %u), (%u, %u, %u)>>> on device %d\n",
+                    uint64_t pc;
+                    uint64_t size;
+                    SANITIZER_SAFECALL(sanitizerGetFunctionPcAndSize(pLaunchData->module, pLaunchData->functionName, &pc, &size));
+                    PRINT("[SANITIZER INFO] Launching kernel %s <<<(%u, %u, %u), (%u, %u, %u)>>> on device %d, pc: 0x%lx, size: %lu\n",
                             func_name,
                             pLaunchData->gridDim_x, pLaunchData->gridDim_y, pLaunchData->gridDim_z,
                             pLaunchData->blockDim_x, pLaunchData->blockDim_y, pLaunchData->blockDim_z,
-                            device_id);
+                            device_id, pc, size);
 
-                    LaunchBeginCallback(pLaunchData->context, pLaunchData->module, pLaunchData->function,
+                    LaunchBeginCallback(pLaunchData->context, pLaunchData->module, pLaunchData->function, pc,
                                     func_name, pLaunchData->hStream, blockDims, gridDims);
                     break;
                 }
@@ -913,6 +1291,7 @@ void enable_compute_sanitizer(bool enable) {
 int InitializeInjection()
 {
     sanitizer_debug_wait();
+    LoadKernelWhiteList(std::getenv("YOSEMITE_KERNEL_WHITELIST"));
     Sanitizer_SubscriberHandle handle;
     SANITIZER_SAFECALL(sanitizerSubscribe(&handle, ComputeSanitizerCallback, nullptr));
     SANITIZER_SAFECALL(sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_RESOURCE));

@@ -9,6 +9,7 @@ CXX            ?= g++
 NVCC           := $(CUDA_PATH)/bin/nvcc -ccbin $(CXX)
 
 CXX_FLAGS      ?=
+EXTRA_CXX_FLAGS ?=
 INCLUDES       ?=
 LDFLAGS        ?=
 LINK_LIBS      ?=
@@ -35,6 +36,7 @@ ifeq ($(DEBUG), 1)
 else
 	CXX_FLAGS += -O3
 endif
+CXX_FLAGS += $(EXTRA_CXX_FLAGS)
 
 ################################################################################
 
@@ -42,9 +44,9 @@ endif
 TARGET_ARCH   := $(shell uname -m)
 
 ifeq ($(TARGET_ARCH),aarch64)
-    SMS        ?= 53 61 70 72 75 80 86 87 90
+    SMS        ?= 75 80 86 87 89 90 120
 else
-    SMS        ?= 52 60 70 75 80 86 90
+    SMS        ?= 75 80 86 89 90 120
 endif
 
 # Generate SASS code for each SM architecture listed in $(SMS)
@@ -96,7 +98,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(CXX_FLAGS) $(INCLUDES) -fPIC -o $@ -c $<
 
 $(PATCH_DIR)/%.fatbin: $(PATCH_SRC_DIR)/%.cu
-	$(NVCC) $(NVCC_FLAGS) $(NVCC_INCS) $(GENCODE_FLAGS) -o $@ -c $<
+	$(NVCC) $(NVCC_FLAGS) $(NVCC_INCS) $(GENCODE_FLAGS) -o $@ $<
 
 clean:
 	rm -rf $(LIB_DIR)
