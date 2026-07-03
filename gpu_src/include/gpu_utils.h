@@ -36,6 +36,12 @@ __device__ __forceinline__ int4 get_ctaid(void) {
     return ret;
 }
 
+__device__ __forceinline__ uint64_t get_ctaid_as_uint64(void) {
+    int4 ctaid = get_ctaid();
+    uint64_t ret = (uint64_t)(ctaid.x + ctaid.y * gridDim.x + ctaid.z * gridDim.x * gridDim.y);
+    return ret;
+}
+
 //  Get the number of CTA ids per grid
 __device__ __forceinline__ int4 get_nctaid(void) {
     int4 ret;
@@ -65,6 +71,22 @@ __device__ __forceinline__ uint64_t get_block_num_threads() {
     return blockDim.x * blockDim.y * blockDim.z;
 }
 
+__device__ __forceinline__ uint32_t get_distint_sector_count(uint64_t sector_tag, uint32_t active_mask) {
+    uint32_t match_mask = 0;
+    match_mask = __match_any_sync(active_mask, sector_tag);
+    uint32_t leader = __ffs(match_mask) - 1;
+    uint32_t is_leader = (leader == get_laneid()) ? 1 : 0;
+    uint32_t final_mask = __ballot_sync(active_mask, is_leader);
+    return __popc(final_mask);
+}
+
+__device__ __forceinline__ uint32_t get_unique_address_mask(uint64_t addr_tag, uint32_t active_mask) {
+    uint32_t match_mask = 0;
+    match_mask = __match_any_sync(active_mask, addr_tag);
+    uint32_t leader = __ffs(match_mask) - 1;
+    uint32_t is_leader = (leader == get_laneid()) ? 1 : 0;
+    return __ballot_sync(active_mask, is_leader);
+}
 
 template <class T>
 __device__ __forceinline__ T shfl(T v, uint32_t srcline, uint32_t mask = 0xFFFFFFFF) {
