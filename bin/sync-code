@@ -50,6 +50,7 @@ check_git_clean() {
 # check git clean
 for path in ${GIT_PATH_LIST[@]}; do
     cd $path
+    echo "🔍 Checking git status in $(basename "$path")"
     check_git_clean
 done
 
