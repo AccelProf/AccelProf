@@ -119,6 +119,7 @@ do
         ;;
     esac
 done
+
 EXECUTABLE=$1
 ARGS="${*:2}"
 
@@ -252,6 +253,7 @@ printf "%-30s: %s\n" "[ACCELPROF INFO] OPTIONS" \
         "${OPTION_STR}" >> ${OUTPUT_REDIRECT}
 printf "%-30s: %s %s\n" "[ACCELPROF INFO] COMMAND" \
         "${EXECUTABLE}" "${ARGS}" >> ${OUTPUT_REDIRECT}
+
 if [ "${ENABLE_LINUX_PERF}" = "1" ]; then
     PERF_OUTPUT=${RESULT_DIR}/${YOSEMITE_APP_NAME}.perf.data
     printf "%-30s: %s\n" "[ACCELPROF INFO] PERF" \
@@ -263,7 +265,6 @@ start_time=$(date +%s)
 printf "%-30s: %s\n\n" "[ACCELPROF INFO] START TIME" "$(date)" >> ${OUTPUT_REDIRECT}
 
 # accelprof
-
 if [ ${YOSEMITE_DEVICE} == "nvc" ]
 then
     LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/libcompute_sanitizer.so
