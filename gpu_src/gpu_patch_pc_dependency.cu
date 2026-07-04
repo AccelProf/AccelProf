@@ -54,9 +54,9 @@ SanitizerPatchResult CommonCallback(
     MemoryType type)
 {
     auto* pTracker = (MemoryAccessTracker*)userdata;
-    if (!pTracker->enabled_instrumenting) {
-        return SANITIZER_PATCH_SUCCESS;
-    }
+    // if (!pTracker->enabled_instrumenting) {
+    //     return SANITIZER_PATCH_SUCCESS;
+    // }
 
     uint32_t active_mask = __activemask();
     uint32_t laneid = get_laneid();
@@ -154,9 +154,9 @@ SanitizerPatchResult BlockExitCallback(void* userdata, uint64_t pc)
 {
 
     MemoryAccessTracker* tracker = (MemoryAccessTracker*)userdata;
-    if (!tracker->enabled_instrumenting) {
-        return SANITIZER_PATCH_SUCCESS;
-    }
+    // if (!tracker->enabled_instrumenting) {
+    //     return SANITIZER_PATCH_SUCCESS;
+    // }
     DoorBell* doorbell = tracker->doorBell;
 
     uint32_t active_mask = __activemask();

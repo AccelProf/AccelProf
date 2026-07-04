@@ -98,7 +98,6 @@ struct MemoryAccessTracker
     uint64_t accessCount;
     uint64_t accessSize;
     uint64_t kernel_pc;
-    bool enabled_instrumenting;
     int32_t target_block[3]; // target block to sample [x, y, z]
     DoorBell* doorBell;
     MemoryAccess* access_buffer;

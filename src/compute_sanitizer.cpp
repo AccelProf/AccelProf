@@ -98,9 +98,9 @@ void LoadKernelWhiteList(const char* whitelist_path) {
     }
 }
 
-bool SanitizerKernelWhiteListCheck(const std::string& functionName){
+bool SanitizerKernelWhiteListHit(const std::string& functionName){
     if (sanitizer_kernel_white_list.empty()) {
-        return true;
+        return true;    // no whitelist, allow all kernels
     }
     for (const auto& kernel : sanitizer_kernel_white_list) {
         if (functionName.find(kernel) != std::string::npos) {
@@ -158,9 +158,9 @@ void ModuleUnloadedCallback(CUmodule module) {
 
     auto it = sanitizer_active_modules.find(module);
     assert(it != sanitizer_active_modules.end());
-    // if (it->second) {   // unpatch if module is patched
-    //     SANITIZER_SAFECALL(sanitizerUnpatchModule(module));
-    // }
+    if (it->second) {   // unpatch if module is patched
+        SANITIZER_SAFECALL(sanitizerUnpatchModule(module));
+    }
     sanitizer_active_modules.erase(it);
 }
 
@@ -474,12 +474,11 @@ void LaunchBeginCallback(
     dim3 blockDims,
     dim3 gridDims)
 {
-    bool launch_monitoring = true;
     if (sanitizer_options.patch_name != GPU_NO_PATCH) {
         // sampling
         sanitizer_options.grid_launch_id++;
         if ((sanitizer_options.grid_launch_id % sanitizer_options.sample_rate == 0) &&
-            SanitizerKernelWhiteListCheck(functionName)) {
+            SanitizerKernelWhiteListHit(functionName)) {
             
             PRINT("[SANITIZER INFO] Monitoring kernel %s, launch id %lu\n",
                     functionName.c_str(), sanitizer_options.grid_launch_id);
@@ -491,15 +490,15 @@ void LaunchBeginCallback(
         } else {
             PRINT("[SANITIZER INFO] Skipping kernel %s monitoring, launch id %lu\n",
                     functionName.c_str(), sanitizer_options.grid_launch_id);
-            launch_monitoring = false;
-            // auto it = sanitizer_active_modules.find(module);
-            // if (it != sanitizer_active_modules.end()) {
-            //     if (it->second) {
-            //         // SANITIZER_SAFECALL(sanitizerUnpatchModule(module));
-            //         it->second = false;
-            //     }
-            //     return;
-            // }
+            auto it = sanitizer_active_modules.find(module);
+            if (it != sanitizer_active_modules.end()) {
+                if (it->second) {
+                    SANITIZER_SAFECALL(sanitizerUnpatchModule(module));
+                    it->second = false;
+                }
+                return;
+            }
+            assert(0 && "Module not found in sanitizer_active_modules map. This should not happen.");
         }
 
         buffer_init(context);
@@ -681,7 +680,6 @@ void LaunchBeginCallback(
         }
 
         host_tracker_handle->kernel_pc = pc; // for in-gpu offset calculation
-        host_tracker_handle->enabled_instrumenting = launch_monitoring;
         SANITIZER_SAFECALL(
             sanitizerMemcpyHostToDeviceAsync(
                 device_tracker_handle, host_tracker_handle, sizeof(MemoryAccessTracker), hstream));
@@ -689,11 +687,9 @@ void LaunchBeginCallback(
     }
 
     int device_id = sanitizer_ctx_to_device[context];
-    if(launch_monitoring) {
-        yosemite_kernel_start_callback(
-            functionName, device_id, gridDims.x, gridDims.y, gridDims.z, blockDims.x, blockDims.y, blockDims.z
-        );
-    }
+    yosemite_kernel_start_callback(
+        functionName, device_id, gridDims.x, gridDims.y, gridDims.z, blockDims.x, blockDims.y, blockDims.z
+    );
 }
 
 
@@ -706,8 +702,8 @@ void LaunchEndCallback(
     Sanitizer_StreamHandle phstream)
 {
     // sampling
-    if (sanitizer_options.grid_launch_id % sanitizer_options.sample_rate != 0 ||
-        !SanitizerKernelWhiteListCheck(functionName)) {
+    if (!((sanitizer_options.grid_launch_id % sanitizer_options.sample_rate == 0) &&
+            SanitizerKernelWhiteListHit(functionName))) {
         return;
     }
 
