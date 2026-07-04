@@ -21,11 +21,21 @@ A Modular Program Analysis Tool Framework for Emerging Accelerators.
 git clone --recursive https://github.com/AccelProf/AccelProf.git
 git submodule update --init --recursive
 
-# Check dependences
-bash ./bin/utils/check_build_env.sh
-
 # Build and install
-./bin/build
+#   DEBUG=1: enable debug symbols (-g)
+#   OPT_LVL=0|1|2|3: compiler optimization level
+#   ENABLE_CS=1: enable Compute Sanitizer backend
+#   ENABLE_NVBIT=1: enable NVBit backend
+#   ENABLE_TORCH=1: enable PyTorch profiling
+#   ENABLE_ROCM=1: enable ROCm backend
+make \
+    DEBUG=0 \
+    OPT_LVL=0 \
+    ENABLE_CS=0 \
+    ENABLE_NVBIT=0 \
+    ENABLE_TORCH=0 \
+    ENABLE_ROCM=0
+
 
 # Set env
 export ACCEL_PROF_HOME=$(pwd)
