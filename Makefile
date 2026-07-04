@@ -9,7 +9,6 @@ CXX            ?= g++
 NVCC           := $(CUDA_PATH)/bin/nvcc -ccbin $(CXX)
 
 CXX_FLAGS      ?=
-EXTRA_CXX_FLAGS ?=
 INCLUDES       ?=
 LDFLAGS        ?=
 LINK_LIBS      ?=
@@ -31,12 +30,25 @@ NVCC_FLAGS     += --fatbin --compile-as-tools-patch
 CXX_FLAGS      += -std=c++17
 
 ifeq ($(DEBUG), 1)
-#	NVCC_FLAGS += -g -G
-	CXX_FLAGS += -g -O0
-else
-	CXX_FLAGS += -O3
+	CXX_FLAGS += -g
 endif
-CXX_FLAGS += $(EXTRA_CXX_FLAGS)
+
+OPT_LVL ?= 3
+ifeq ($(OPT_LVL), 0)
+	CXX_FLAGS += -O0
+else ifeq ($(OPT_LVL), 1)
+	CXX_FLAGS += -O1 -march=native
+else ifeq ($(OPT_LVL), 2)
+	CXX_FLAGS += -O2 -march=native
+else ifeq ($(OPT_LVL), 3)
+	CXX_FLAGS += -O3 -march=native
+else
+    $(error Invalid OPT_LVL=$(OPT_LVL), expected 0,1,2,3)
+endif
+
+ifneq ($(OPT_LVL),0)
+    CXX_FLAGS += -march=native
+endif
 
 ################################################################################
 
@@ -44,9 +56,9 @@ CXX_FLAGS += $(EXTRA_CXX_FLAGS)
 TARGET_ARCH   := $(shell uname -m)
 
 ifeq ($(TARGET_ARCH),aarch64)
-    SMS        ?= 75 80 86 87 89 90 120
+    SMS        ?= 75 80 86 87 89 90
 else
-    SMS        ?= 75 80 86 89 90 120
+    SMS        ?= 75 80 86 89 90
 endif
 
 # Generate SASS code for each SM architecture listed in $(SMS)

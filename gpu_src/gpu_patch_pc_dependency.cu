@@ -86,7 +86,7 @@ SanitizerPatchResult CommonCallback(
     accesses = (MemoryAccess*) shfl((uint64_t)accesses, first_laneid, active_mask);
     if (accesses) {
         if(type == MemoryType::Local){
-            accesses->addresses[laneid] = ((get_flat_thread_id()) << 54) |((uint64_t)(uintptr_t)ptr); // use high 10 bits to store thread id for local memory access
+            accesses->addresses[laneid] = (((uint64_t) get_flat_thread_id()) << 54) |((uint64_t)(uintptr_t)ptr); // use high 10 bits to store thread id for local memory access
         } else {
             accesses->addresses[laneid] = (uint64_t)(uintptr_t)ptr;
         }

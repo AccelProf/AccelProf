@@ -619,15 +619,28 @@ void LaunchBeginCallback(
                     PRINT("[SANITIZER ERROR] Invalid target block format: %s\n", target_block_str);
                     exit(EXIT_FAILURE);
                 }
-                if (host_tracker_handle->target_block[0] < 0 || host_tracker_handle->target_block[1] < 0 || host_tracker_handle->target_block[2] < 0) {
-                    PRINT("[SANITIZER ERROR] Invalid target block: %d, %d, %d\n", host_tracker_handle->target_block[0], host_tracker_handle->target_block[1], host_tracker_handle->target_block[2]);
+                if (host_tracker_handle->target_block[0] < 0 ||
+                    host_tracker_handle->target_block[1] < 0 ||
+                    host_tracker_handle->target_block[2] < 0) {
+                    PRINT("[SANITIZER ERROR] Invalid target block: %d, %d, %d\n",
+                          host_tracker_handle->target_block[0],
+                          host_tracker_handle->target_block[1],
+                          host_tracker_handle->target_block[2]);
                     exit(EXIT_FAILURE);
                 }
-                if (host_tracker_handle->target_block[0] >= gridDims.x || host_tracker_handle->target_block[1] >= gridDims.y || host_tracker_handle->target_block[2] >= gridDims.z) {
-                    PRINT("[SANITIZER ERROR] Invalid target block: %d, %d, %d\n", host_tracker_handle->target_block[0], host_tracker_handle->target_block[1], host_tracker_handle->target_block[2]);
+                if (host_tracker_handle->target_block[0] >= gridDims.x ||
+                    host_tracker_handle->target_block[1] >= gridDims.y ||
+                    host_tracker_handle->target_block[2] >= gridDims.z) {
+                    PRINT("[SANITIZER ERROR] Invalid target block: %d, %d, %d\n",
+                          host_tracker_handle->target_block[0],
+                          host_tracker_handle->target_block[1],
+                          host_tracker_handle->target_block[2]);
                     exit(EXIT_FAILURE);
                 }
-                PRINT("[SANITIZER INFO] Target block: %d, %d, %d\n", host_tracker_handle->target_block[0], host_tracker_handle->target_block[1], host_tracker_handle->target_block[2]);
+                PRINT("[SANITIZER INFO] Target block: %d, %d, %d\n",
+                      host_tracker_handle->target_block[0],
+                      host_tracker_handle->target_block[1],
+                      host_tracker_handle->target_block[2]);
             } else {
                 host_tracker_handle->target_block[0] = 0;
                 host_tracker_handle->target_block[1] = 0;
@@ -992,11 +1005,10 @@ void ComputeSanitizerCallback(
                     PRINT("[SANITIZER INFO] Context %p creation finished on device %p\n",
                             &pContextData->context, &pContextData->device);
 
-                    CUstream p_stream;
-                    Sanitizer_StreamHandle p_stream_handle;
-                    sanitizer_priority_stream_get(pContextData->context, &p_stream);
-                    PRINT("[SANITIZER INFO] Priority stream %p created on context %p\n",
-                            p_stream, pContextData->context);
+                    // CUstream p_stream;
+                    // sanitizer_priority_stream_get(pContextData->context, &p_stream);
+                    // PRINT("[SANITIZER INFO] Priority stream %p created on context %p\n",
+                    //         p_stream, pContextData->context);
                     break;
                 }
                 case SANITIZER_CBID_RESOURCE_CONTEXT_DESTROY_STARTING:
@@ -1046,7 +1058,11 @@ void ComputeSanitizerCallback(
 
                     PRINT("[SANITIZER INFO] Malloc memory %p with size %lu (flag: %u) on device %d\n",
                             (void*)pModuleData->address, pModuleData->size, pModuleData->flags, device_id);
-                    PRINT("[SANITIZER INFO] Sector tag: %p, end tag: %p\n", (void*)(pModuleData->address >> 5), (void*)((pModuleData->address + pModuleData->size - 1) >> 5));
+
+                    size_t end_tag = (pModuleData->address + pModuleData->size - 1) >> 5;
+                    PRINT("[SANITIZER INFO] Sector tag: %p, end tag: %p\n",
+                            (void*)(pModuleData->address >> 5), (void*)end_tag);
+
                     yosemite_alloc_callback(
                             pModuleData->address, pModuleData->size, pModuleData->flags, device_id);
                     break;
@@ -1054,7 +1070,8 @@ void ComputeSanitizerCallback(
                 case SANITIZER_CBID_RESOURCE_DEVICE_MEMORY_FREE:
                 {
                     auto *pModuleData = (Sanitizer_ResourceMemoryData *)cbdata;
-                    if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME || pModuleData->size == 0)
+                    if (pModuleData->flags == SANITIZER_MEMORY_FLAG_CG_RUNTIME ||
+                            pModuleData->size == 0)
                         break;
 
                     CUdevice device_id = sanitizer_ctx_to_device[pModuleData->context];
@@ -1074,7 +1091,11 @@ void ComputeSanitizerCallback(
                     }
                     PRINT("[SANITIZER INFO] Alloc host memory %p with size %lu (flag: %u)\n",
                             (void*)pModuleData->address, pModuleData->size, pModuleData->flags);
-                    PRINT("[SANITIZER INFO] Sector tag: %p, end tag: %p\n", (void*)(pModuleData->address >> 5), (void*)((pModuleData->address + pModuleData->size - 1) >> 5));
+
+                    size_t end_tag = (pModuleData->address + pModuleData->size - 1) >> 5;
+                    PRINT("[SANITIZER INFO] Sector tag: %p, end tag: %p\n",
+                            (void*)(pModuleData->address >> 5), (void*)end_tag);
+
                     yosemite_alloc_callback(
                             pModuleData->address, pModuleData->size, pModuleData->flags, 0);
                     break;
@@ -1292,6 +1313,7 @@ int InitializeInjection()
 {
     sanitizer_debug_wait();
     LoadKernelWhiteList(std::getenv("YOSEMITE_KERNEL_WHITELIST"));
+
     Sanitizer_SubscriberHandle handle;
     SANITIZER_SAFECALL(sanitizerSubscribe(&handle, ComputeSanitizerCallback, nullptr));
     SANITIZER_SAFECALL(sanitizerEnableDomain(1, handle, SANITIZER_CB_DOMAIN_RESOURCE));
