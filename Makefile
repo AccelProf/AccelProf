@@ -25,10 +25,25 @@ else
 MAXRREGCOUNT_FLAG=
 endif
 
-ifeq ($(DEBUG),1)
-DEBUG_FLAGS := -g -O0
+ifeq ($(DEBUG), 1)
+	CXX_FLAGS += -g
+endif
+
+OPT_LVL ?= 3
+ifeq ($(OPT_LVL), 0)
+	CXX_FLAGS += -O0
+else ifeq ($(OPT_LVL), 1)
+	CXX_FLAGS += -O1 -march=native
+else ifeq ($(OPT_LVL), 2)
+	CXX_FLAGS += -O2 -march=native
+else ifeq ($(OPT_LVL), 3)
+	CXX_FLAGS += -O3 -march=native
 else
-DEBUG_FLAGS := -O3
+    $(error Invalid OPT_LVL=$(OPT_LVL), expected 0,1,2,3)
+endif
+
+ifneq ($(OPT_LVL),0)
+    CXX_FLAGS += -march=native
 endif
 
 NVBIT_PATH=core/
