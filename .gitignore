@@ -2,6 +2,7 @@
 *.so
 *.log
 run.sh
+local_config.mk
 
 .vscode/
 example/

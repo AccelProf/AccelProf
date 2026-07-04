@@ -1,3 +1,6 @@
+LOCAL_CONFIG ?= local_config.mk
+-include $(LOCAL_CONFIG)
+
 DEBUG ?= 0
 OPT_LVL ?= 3
 
