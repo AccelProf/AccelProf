@@ -1,0 +1,6 @@
+lib/
+obj/
+cpp_trace/
+
+
+.vscode/
