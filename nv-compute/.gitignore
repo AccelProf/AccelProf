@@ -1,0 +1,4 @@
+*.fatbin
+*.so
+.vscode/
+lib/
