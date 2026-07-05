@@ -1,0 +1,5 @@
+lib/
+obj/
+py_frame/
+
+.vscode/
