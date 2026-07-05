@@ -64,8 +64,8 @@ make -j install DEBUG=$DEBUG OPT_LVL=$OPT_LVL \
 # build sanalyzer
 cd $ACCEL_PROF_DIR/sanalyzer
 make -j install DEBUG=$DEBUG OPT_LVL=$OPT_LVL \
-                             SANITIZER_TOOL_DIR=$ACCEL_PROF_DIR/nv-compute \
-                             NV_NVBIT_DIR=$ACCEL_PROF_DIR/nv-nvbit \
+                             SANITIZER_TOOL_DIR=$ACCEL_PROF_DIR/backends/nv-compute \
+                             NV_NVBIT_DIR=$ACCEL_PROF_DIR/backends/nv-nvbit \
                              CPP_TRACE_DIR=$ACCEL_PROF_DIR/build/sanalyzer/cpp_trace \
                              PY_FRAME_DIR=$ACCEL_PROF_DIR/build/sanalyzer/py_frame \
                              PAR_HASHMAP_INC_DIR=$ACCEL_PROF_DIR/third_party/parallel-hashmap/ \
@@ -81,32 +81,32 @@ fi
 
 # build nv-compute
 if [ $ENABLE_COMPUTE_SANALYZER_BACKEND -eq 1 ]; then
-    cd $ACCEL_PROF_DIR/nv-compute
+    cd $ACCEL_PROF_DIR/backends/nv-compute
     make -j DEBUG=$DEBUG OPT_LVL=$OPT_LVL \
                          SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer \
                          TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope \
-                         PATCH_SRC_DIR=$ACCEL_PROF_DIR/nv-compute/gpu_src
+                         PATCH_SRC_DIR=$ACCEL_PROF_DIR/backends/nv-compute/gpu_src
 
-    cp $ACCEL_PROF_DIR/nv-compute/lib/*.so $ACCEL_PROF_DIR/lib/
+    cp $ACCEL_PROF_DIR/backends/nv-compute/lib/*.so $ACCEL_PROF_DIR/lib/
 fi
 
 
 # build nv-nvbit
 if [ $ENABLE_NVBIT_BACKEND -eq 1 ]; then
-    cd $ACCEL_PROF_DIR/nv-nvbit
+    cd $ACCEL_PROF_DIR/backends/nv-nvbit
     make -j DEBUG=$DEBUG OPT_LVL=$OPT_LVL \
                          SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer \
                          TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope
 
-    cp $ACCEL_PROF_DIR/nv-nvbit/lib/*.so $ACCEL_PROF_DIR/lib/
+    cp $ACCEL_PROF_DIR/backends/nv-nvbit/lib/*.so $ACCEL_PROF_DIR/lib/
 fi
 
 
 # build amd-rocm (Requires AMD ROCm development environment)
 if [ $ENABLE_AMD_ROCM_BACKEND -eq 1 ]; then
-    cd $ACCEL_PROF_DIR/amd-rocm
+    cd $ACCEL_PROF_DIR/backends/amd-rocm
     make -j DEBUG=$DEBUG OPT_LVL=$OPT_LVL \
                          SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer
 
-    cp $ACCEL_PROF_DIR/amd-rocm/build/lib/*.so $ACCEL_PROF_DIR/lib/
+    cp $ACCEL_PROF_DIR/backends/amd-rocm/build/lib/*.so $ACCEL_PROF_DIR/lib/
 fi

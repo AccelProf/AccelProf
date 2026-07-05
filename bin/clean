@@ -10,10 +10,10 @@ cd $ACCEL_PROF_DIR
 rm -rf lib
 rm -rf build
 
-cd $ACCEL_PROF_DIR/nv-compute
+cd $ACCEL_PROF_DIR/backends/nv-compute
 make clean
 
-cd $ACCEL_PROF_DIR/nv-nvbit
+cd $ACCEL_PROF_DIR/backends/nv-nvbit
 make clean
 
 cd $ACCEL_PROF_DIR/tensor_scope
