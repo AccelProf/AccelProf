@@ -1,0 +1,7 @@
+*.o
+*.so
+
+.vscode/
+lib/
+obj/
+test/

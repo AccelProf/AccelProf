@@ -1,0 +1,32 @@
+#!/bin/bash
+
+if [ -z "${CU_PROF_HOME}" ]; then
+    echo "Please set the environment variable CU_PROF_HOME to the root directory of the CUDA Profiling Tools."
+    exit 1
+fi
+
+# install nvbit under the tools directory
+if [ "$(pwd)" == "$CU_PROF_HOME" ]; then
+    echo "Please run this script from the directory where it is located."
+    exit 1
+fi
+
+# https://github.com/NVlabs/NVBit/releases
+NVBIT_URL="https://github.com/NVlabs/NVBit/releases/download/1.7.1/nvbit-Linux-x86_64-1.7.1.tar.bz2"
+NVBIT_PACKAGE="nvbit-Linux-x86_64-1.7.1.tar.bz2"
+NVBIT_DIR="nvbit_release"
+
+TMP_DIR="${CU_PROF_HOME}/tmp"
+
+mkdir -p ${TMP_DIR}
+cd ${TMP_DIR}
+
+wget ${NVBIT_URL}
+tar -xvf ${NVBIT_PACKAGE}
+
+mv ${CU_PROF_HOME}/core ${TMP_DIR}/core.org.bak
+mv ${TMP_DIR}/${NVBIT_DIR}/core ${CU_PROF_HOME}/
+
+# cleanup
+rm ${NVBIT_PACKAGE}
+rm -rf ${NVBIT_DIR}
