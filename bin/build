@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 DEBUG=0
 OPT_LVL=3 # 0, 1, 2, 3
 
@@ -42,6 +40,8 @@ mkdir -p $ACCEL_PROF_DIR/build
 if [ $ENABLE_TORCH_MONITOR_BACKEND -eq 1 ]; then
     source ${ACCEL_PROF_DIR}/bin/utils/check_build_env.sh
 fi
+
+set -e
 
 # build libbacktrace
 cd $ACCEL_PROF_DIR/sanalyzer/cpp_trace

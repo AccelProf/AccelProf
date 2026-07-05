@@ -179,7 +179,7 @@ void ModuleLoadedCallback(CUmodule module)
     const char* env_name = std::getenv("ACCEL_PROF_HOME");
     std::string patch_path;
     if (env_name) {
-        patch_path = std::string(env_name) + "/nv-compute/lib/gpu_patch/";
+        patch_path = std::string(env_name) + "/backends/nv-compute/lib/gpu_patch/";
     } else {
         std::cerr << "Failed to load fatbin. No patch path specified." << std::endl;
     }

@@ -286,8 +286,8 @@ YosemiteResult_t yosemite_init(AccelProfOptions_t& options) {
         options.patch_file = "gpu_patch_block_divergence_analysis.fatbin";
     } else if (tool == PC_DEPENDENCY_ANALYSIS) {
         options.patch_name = GPU_PATCH_PC_DEPENDENCY_ANALYSIS;
-        // nv-compute/Makefile generates fatbins based on gpu_src/*.cu filenames.
-        // The source file for this tool is nv-compute/gpu_src/gpu_patch_pc_dependency.cu
+        // backends/nv-compute/Makefile generates fatbins based on gpu_src/*.cu filenames.
+        // The source file for this tool is backends/nv-compute/gpu_src/gpu_patch_pc_dependency.cu
         options.patch_file = "gpu_patch_pc_dependency.fatbin";
     }
 

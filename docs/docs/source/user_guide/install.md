@@ -88,28 +88,28 @@ make -j install DEBUG=$DEBUG INSTALL_DIR=$ACCEL_PROF_DIR/build/tensor_scope
 #### 6. Build `nv-compute`
 
 ```bash
-cd $ACCEL_PROF_DIR/nv-compute
-make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer                 TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope                 PATCH_SRC_DIR=$ACCEL_PROF_DIR/nv-compute/gpu_src
+cd $ACCEL_PROF_DIR/backends/nv-compute
+make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer                 TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope                 PATCH_SRC_DIR=$ACCEL_PROF_DIR/backends/nv-compute/gpu_src
 
-cp $ACCEL_PROF_DIR/nv-compute/lib/*.so $ACCEL_PROF_DIR/lib/
+cp $ACCEL_PROF_DIR/backends/nv-compute/lib/*.so $ACCEL_PROF_DIR/lib/
 ```
 
 #### 7. Build `nv-nvbit`
 
 ```bash
-cd $ACCEL_PROF_DIR/nv-nvbit
+cd $ACCEL_PROF_DIR/backends/nv-nvbit
 make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer                      TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope
 
-cp $ACCEL_PROF_DIR/nv-nvbit/lib/*.so $ACCEL_PROF_DIR/lib/
+cp $ACCEL_PROF_DIR/backends/nv-nvbit/lib/*.so $ACCEL_PROF_DIR/lib/
 ```
 
 #### 8. Build `amd-rocm` (Optional – requires ROCm dev environment)
 
 ```bash
-cd $ACCEL_PROF_DIR/amd-rocm
+cd $ACCEL_PROF_DIR/backends/amd-rocm
 make -j DEBUG=$DEBUG SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer
 
-cp $ACCEL_PROF_DIR/amd-rocm/build/lib/*.so $ACCEL_PROF_DIR/lib/
+cp $ACCEL_PROF_DIR/backends/amd-rocm/build/lib/*.so $ACCEL_PROF_DIR/lib/
 ```
 
 ---
