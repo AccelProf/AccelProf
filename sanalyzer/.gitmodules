@@ -1,0 +1,6 @@
+[submodule "py_frame"]
+	path = py_frame
+	url = https://github.com/AccelProf/py_frame.git
+[submodule "cpp_trace"]
+	path = cpp_trace
+	url = https://github.com/AccelProf/cpp_trace.git
