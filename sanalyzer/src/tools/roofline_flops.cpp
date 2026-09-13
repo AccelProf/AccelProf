@@ -1,4 +1,5 @@
 #include "tools/roofline_flops.h"
+#include "utils/helper.h"
 #include "nvbit_common.h"
 #include <fstream>
 using namespace yosemite;
@@ -49,7 +50,9 @@ void RooflineFlops::query_ranges(void* ranges, uint32_t limit, uint32_t* count) 
 }
 
 void RooflineFlops::flush() {
-    std::string file_name = "./out/roofline_flops.txt";
+    std::string out_dir = resolve_output_path("out");
+    check_folder_existance(out_dir);
+    std::string file_name = out_dir + "/roofline_flops.txt";
     std::ofstream out(file_name);
     for (auto pair : kernel_flops_map) {
         out << pair.second << "|" << pair.first->kernel_name << std::endl;

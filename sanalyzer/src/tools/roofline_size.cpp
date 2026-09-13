@@ -53,7 +53,9 @@ void RooflineSize::query_ranges(void* ranges, uint32_t limit, uint32_t* count) {
 }
 
 void RooflineSize::flush() {
-    std::string file_name = "./out/roofline_size.txt";
+    std::string out_dir = resolve_output_path("out");
+    check_folder_existance(out_dir);
+    std::string file_name = out_dir + "/roofline_size.txt";
     std::ofstream out(file_name);
     for (auto pair : kernel_size_map) {
         out << std::get<0>(pair.second) << "|" << std::get<1>(pair.second) << "|" << pair.first->kernel_name << std::endl;

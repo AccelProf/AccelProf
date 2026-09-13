@@ -1,4 +1,5 @@
 #include "tools/roofline_time.h"
+#include "utils/helper.h"
 #include <fstream>
 #include <chrono>
 #include <iomanip> 
@@ -75,7 +76,9 @@ void RooflineTime::query_ranges(void* ranges, uint32_t limit, uint32_t* count) {
 void RooflineTime::flush() {
     printf("Max_mem_usage: %.2f MiB\n", (double)max_mem_usage / 1024.0 / 1024.0);
     printf("Max_ten_usage: %.2f MiB\n", (double)max_ten_usage / 1024.0 / 1024.0);
-    std::string file_name = "./out/roofline_time.txt";
+    std::string out_dir = resolve_output_path("out");
+    check_folder_existance(out_dir);
+    std::string file_name = out_dir + "/roofline_time.txt";
     std::ofstream out(file_name);
     out << std::fixed << std::setprecision(6);
     for (auto pair : kernel_time_map) {
