@@ -26,7 +26,7 @@
 using namespace yosemite;
 
 
-BlockDivergenceAnalysis::BlockDivergenceAnalysis() : Tool(MEM_TRACE) {
+BlockDivergenceAnalysis::BlockDivergenceAnalysis() : Tool(BLOCK_DIVERGENCE_ANALYSIS) {
     const char* torch_prof = std::getenv("TORCH_PROFILE_ENABLED");
     if (torch_prof && std::string(torch_prof) == "1") {
         fprintf(stdout, "Enabling torch profiler in BlockDivergenceAnalysis.\n");
