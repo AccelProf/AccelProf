@@ -19,7 +19,8 @@ typedef enum {
     HEATMAP_ANALYSIS = 14,
     BLOCK_DIVERGENCE_ANALYSIS = 15,
     PC_DEPENDENCY_ANALYSIS = 16,
-    TOOL_NUMS = 17
+    REDSAN = 17,
+    TOOL_NUMS = 18
 } AnalysisTool_t;
 
 #endif // TOOL_TYPE_H

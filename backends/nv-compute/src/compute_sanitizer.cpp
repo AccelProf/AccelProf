@@ -274,7 +274,8 @@ void ModuleLoadedCallback(CUmodule module)
                 SANITIZER_INSTRUCTION_LOCAL_MEMORY_ACCESS, module, "MemoryLocalAccessCallback"));
         SANITIZER_SAFECALL(
             sanitizerPatchInstructions(SANITIZER_INSTRUCTION_BLOCK_EXIT, module, "BlockExitCallback"));
-    } else if (sanitizer_options.patch_name == GPU_PATCH_PC_DEPENDENCY_ANALYSIS) {
+    } else if ((sanitizer_options.patch_name == GPU_PATCH_PC_DEPENDENCY_ANALYSIS ||
+               sanitizer_options.patch_name == GPU_PATCH_REDSAN)) {
         SANITIZER_SAFECALL(
             sanitizerPatchInstructions(
                 SANITIZER_INSTRUCTION_GLOBAL_MEMORY_ACCESS, module, "MemoryGlobalAccessCallback"));
@@ -443,7 +444,8 @@ void buffer_init(CUcontext context) {
             SANITIZER_SAFECALL(
                 sanitizerAllocHost(context, (void**)&global_doorbell, sizeof(DoorBell)));
         }
-    } else if (sanitizer_options.patch_name == GPU_PATCH_PC_DEPENDENCY_ANALYSIS) {
+    } else if ((sanitizer_options.patch_name == GPU_PATCH_PC_DEPENDENCY_ANALYSIS ||
+               sanitizer_options.patch_name == GPU_PATCH_REDSAN)) {
         if (!device_access_buffer) {
             SANITIZER_SAFECALL(
                 sanitizerAlloc(
@@ -666,7 +668,8 @@ void LaunchBeginCallback(
             global_doorbell->num_threads = num_threads;
             global_doorbell->full = 0;
             host_tracker_handle->doorBell = global_doorbell;
-        } else if (sanitizer_options.patch_name == GPU_PATCH_PC_DEPENDENCY_ANALYSIS) {
+        } else if ((sanitizer_options.patch_name == GPU_PATCH_PC_DEPENDENCY_ANALYSIS ||
+               sanitizer_options.patch_name == GPU_PATCH_REDSAN)) {
             SANITIZER_SAFECALL(
                 sanitizerMemset(
                     device_access_buffer, 0, sizeof(MemoryAccess) * MEMORY_ACCESS_BUFFER_SIZE, hstream));
@@ -912,7 +915,8 @@ void LaunchEndCallback(
                     host_access_buffer, device_access_buffer, sizeof(MemoryAccess) * numEntries, hstream));
 
             yosemite_gpu_data_analysis(host_access_buffer, numEntries);
-        } else if (sanitizer_options.patch_name == GPU_PATCH_PC_DEPENDENCY_ANALYSIS) {
+        } else if ((sanitizer_options.patch_name == GPU_PATCH_PC_DEPENDENCY_ANALYSIS ||
+               sanitizer_options.patch_name == GPU_PATCH_REDSAN)) {
             while (true)
             {
                 if (global_doorbell->num_threads == 0) {

@@ -19,6 +19,7 @@
 #include "tools/heatmap_analysis.h"
 #include "tools/block_divergence_analysis.h"
 #include "tools/pc_dependency_analysis.h"
+#include "tools/redsan.h"
 
 #include <memory>
 #include <map>
@@ -116,6 +117,9 @@ YosemiteResult_t yosemite_tool_enable(AnalysisTool_t& tool) {
     } else if (std::string(tool_name) == "pc_dependency_analysis") {
         tool = PC_DEPENDENCY_ANALYSIS;
         _tools.emplace(PC_DEPENDENCY_ANALYSIS, std::make_shared<PcDependency>());
+    } else if (std::string(tool_name) == "redsan") {
+        tool = REDSAN;
+        _tools.emplace(REDSAN, std::make_shared<Redsan>());
     } else {
         fprintf(stderr, "[SANALYZER ERROR] Tool not found.\n");
         fflush(stderr);
@@ -288,6 +292,12 @@ YosemiteResult_t yosemite_init(AccelProfOptions_t& options) {
         options.patch_name = GPU_PATCH_PC_DEPENDENCY_ANALYSIS;
         // backends/nv-compute/Makefile generates fatbins based on gpu_src/*.cu filenames.
         // The source file for this tool is backends/nv-compute/gpu_src/gpu_patch_pc_dependency.cu
+        options.patch_file = "gpu_patch_pc_dependency.fatbin";
+    } else if (tool == REDSAN) {
+        options.patch_name = GPU_PATCH_REDSAN;
+        // redsan needs exactly the per-lane trace pc_dependency collects
+        // (addresses, flags, size, cta/warp ids, active mask, block exits),
+        // so it reuses that GPU patch rather than shipping a copy of it.
         options.patch_file = "gpu_patch_pc_dependency.fatbin";
     }
 

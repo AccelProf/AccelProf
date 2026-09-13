@@ -26,6 +26,8 @@ Usage:
         heatmap_analysis: Analyze heatmap of memory access.
         block_divergence_analysis: Analyze block divergence of memory access.
         pc_dependency_analysis: Analyze PC dependency of memory access.
+        redsan: Detect redundant memory instructions (dead store, dead load,
+                load-after-store) per PC.
         app_analysis: Analyze CUDA application performance.
         app_analysis_cpu: Analyze CUDA application performance on CPU.
         time_hotness_cpu: Analyze time hotness on CPU.
@@ -47,7 +49,7 @@ Usage:
         Specify the kernel whitelist file.
             - Example: ./kernel_whitelist.txt (each line in the file is a kernel name)
     -n <num_workers>
-        Specify the number of worker threads for pc_dependency_analysis.
+        Specify the number of worker threads for pc_dependency_analysis and redsan.
         Defaults to the number of hardware threads if not set.
     -v
         Verbose mode.
@@ -234,6 +236,9 @@ then
 elif [ ${TOOL} == "pc_dependency_analysis" ]
 then
     export YOSEMITE_TOOL_NAME=pc_dependency_analysis
+elif [ ${TOOL} == "redsan" ]
+then
+    export YOSEMITE_TOOL_NAME=redsan
 elif [ ${TOOL} == "none" ]
 then
     export YOSEMITE_TOOL_NAME=none
