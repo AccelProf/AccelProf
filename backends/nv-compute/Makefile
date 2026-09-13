@@ -102,9 +102,16 @@ INCLUDES       += -I$(SANALYZER_DIR)/include
 LDFLAGS        += -L$(SANALYZER_DIR)/lib -Wl,-rpath=$(SANALYZER_DIR)/lib
 LINK_LIBS	   += -lsanalyzer
 
+# torch_scope is only built when ENABLE_TORCH=1; bin/build forwards that as
+# ENABLE_TORCH_SCOPE so the backend links it only when it was actually built,
+# and ENABLE_CS=1 ENABLE_TORCH=0 still links.
+ENABLE_TORCH_SCOPE ?= 0
+ifeq ($(ENABLE_TORCH_SCOPE),1)
 INCLUDES       += -I$(TORCH_SCOPE_DIR)/include
 LDFLAGS        += -L$(TORCH_SCOPE_DIR)/lib -Wl,-rpath=$(TORCH_SCOPE_DIR)/lib
 LINK_LIBS	   += -ltorch_scope
+CXX_FLAGS      += -DENABLE_TORCH_SCOPE
+endif
 
 SRCS := $(notdir $(wildcard $(SRC_DIR)/*.cpp))
 OBJS := $(addprefix $(OBJ_DIR)/, $(patsubst %.cpp, %.o, $(SRCS)))

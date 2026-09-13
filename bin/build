@@ -85,6 +85,7 @@ if [ $ENABLE_COMPUTE_SANALYZER_BACKEND -eq 1 ]; then
     make -j DEBUG=$DEBUG OPT_LVL=$OPT_LVL \
                          SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer \
                          TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope \
+                         ENABLE_TORCH_SCOPE=$ENABLE_TORCH_MONITOR_BACKEND \
                          PATCH_SRC_DIR=$ACCEL_PROF_DIR/backends/nv-compute/gpu_src
 
     cp $ACCEL_PROF_DIR/backends/nv-compute/lib/*.so $ACCEL_PROF_DIR/lib/
@@ -96,7 +97,8 @@ if [ $ENABLE_NVBIT_BACKEND -eq 1 ]; then
     cd $ACCEL_PROF_DIR/backends/nv-nvbit
     make -j DEBUG=$DEBUG OPT_LVL=$OPT_LVL \
                          SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer \
-                         TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope
+                         TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope \
+                         ENABLE_TORCH_SCOPE=$ENABLE_TORCH_MONITOR_BACKEND
 
     cp $ACCEL_PROF_DIR/backends/nv-nvbit/lib/*.so $ACCEL_PROF_DIR/lib/
 fi

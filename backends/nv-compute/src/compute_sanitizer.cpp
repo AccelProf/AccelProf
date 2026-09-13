@@ -3,7 +3,9 @@
 #include "sanitizer_helper.h"
 #include "gpu_patch.h"
 #include "sanalyzer.h"
+#ifdef ENABLE_TORCH_SCOPE
 #include "torch_scope.h"
+#endif
 
 #include <sanitizer.h>
 #include <vector_types.h>
@@ -1322,6 +1324,7 @@ int InitializeInjection()
 
     // register tensor malloc and free callback
     if (sanitizer_options.torch_prof_enabled) {
+#ifdef ENABLE_TORCH_SCOPE
         enable_torch_scope();
         register_torch_scope_callback(
             TORCH_SCOPE_TENSOR_MALLOC, (torch_scope_callback_t)SanitizerTensorMallocCallback);
@@ -1331,6 +1334,11 @@ int InitializeInjection()
             TORCH_SCOPE_OPERATOR_START, (torch_scope_callback_t)SanitizerOperatorStartCallback);
         register_torch_scope_callback(
             TORCH_SCOPE_OPERATOR_END, (torch_scope_callback_t)SanitizerOperatorEndCallback);
+#else
+        std::cerr << "[SANITIZER WARN] PyTorch profiling was requested, but this "
+                     "build has no torch_scope. Rebuild with ENABLE_TORCH=1."
+                  << std::endl;
+#endif
     }
 
     return 0;

@@ -4,7 +4,9 @@
 #include "backend/nvbit_mem_trace.h"
 #include "backend/nvbit_app_analysis.h"
 #include "backend/nvbit_roofline_flops.h"
+#ifdef ENABLE_TORCH_SCOPE
 #include "torch_scope.h"
+#endif
 
 /* every tool needs to include this once */
 #include "nvbit_tool.h"
@@ -59,11 +61,16 @@ void nvbit_at_init() {
     yosemite_init(nvbit_options);
 
     if (nvbit_options.torch_prof_enabled) {
+#ifdef ENABLE_TORCH_SCOPE
         enable_torch_scope();
         register_torch_scope_callback(TORCH_SCOPE_TENSOR_MALLOC, (torch_scope_callback_t)nvbit_tensor_malloc_callback);
         register_torch_scope_callback(TORCH_SCOPE_TENSOR_FREE, (torch_scope_callback_t)nvbit_tensor_free_callback);
         register_torch_scope_callback(TORCH_SCOPE_OPERATOR_START, (torch_scope_callback_t)nvbit_operator_start_callback);
         register_torch_scope_callback(TORCH_SCOPE_OPERATOR_END, (torch_scope_callback_t)nvbit_operator_end_callback);
+#else
+        fprintf(stderr, "[NVBIT WARN] PyTorch profiling was requested, but this "
+                        "build has no torch_scope. Rebuild with ENABLE_TORCH=1.\n");
+#endif
     }
 
     if (nvbit_options.patch_name == GPU_PATCH_APP_METRIC) {

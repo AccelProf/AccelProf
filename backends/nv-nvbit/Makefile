@@ -56,9 +56,16 @@ SANALYZER_INC = -I$(SANALYZER_DIR)/include
 SANALYZER_LDFLAGS = -L$(SANALYZER_DIR)/lib -Xlinker -rpath -Xlinker $(SANALYZER_DIR)/lib
 SANALYZER_LIB = -lsanalyzer
 
+# torch_scope is only built when ENABLE_TORCH=1; bin/build forwards that as
+# ENABLE_TORCH_SCOPE so the backend links it only when it was actually built,
+# and ENABLE_NVBIT=1 ENABLE_TORCH=0 still links.
+ENABLE_TORCH_SCOPE ?= 0
+ifeq ($(ENABLE_TORCH_SCOPE),1)
 TORCH_SCOPE_INC = -I$(TORCH_SCOPE_DIR)/include
+TORCH_SCOPE_DEFS = -DENABLE_TORCH_SCOPE
 TORCH_SCOPE_LDFLAGS = -L$(TORCH_SCOPE_DIR)/lib -Xlinker -rpath -Xlinker $(TORCH_SCOPE_DIR)/lib
 TORCH_SCOPE_LIB = -ltorch_scope
+endif
 
 SRC_DIR := src/
 OBJ_DIR := obj/
@@ -90,7 +97,7 @@ $(NVBIT_TOOL): $(OBJS) $(NVBIT_PATH)/libnvbit.a
 	$(NVCC) -arch=$(ARCH) $(DEBUG_FLAGS) $(OBJS) $(LIBS) $(NVCC_PATH) $(SANALYZER_LDFLAGS) $(TORCH_SCOPE_LDFLAGS) -lcuda -lcudart_static -shared -o $@ $(SANALYZER_LIB) $(TORCH_SCOPE_LIB)
 
 $(OBJ_DIR)%.o: $(SRC_DIR)/backend/%.cu
-	$(NVCC) -dc -c -std=c++17 $(INCLUDES) $(SANALYZER_INC) $(TORCH_SCOPE_INC) -Xptxas -cloning=no -Xcompiler -Wall -arch=$(ARCH) $(DEBUG_FLAGS) -Xcompiler -fPIC $< -o $@
+	$(NVCC) -dc -c -std=c++17 $(INCLUDES) $(SANALYZER_INC) $(TORCH_SCOPE_INC) $(TORCH_SCOPE_DEFS) -Xptxas -cloning=no -Xcompiler -Wall -arch=$(ARCH) $(DEBUG_FLAGS) -Xcompiler -fPIC $< -o $@
 
 $(OBJ_DIR)%.o:: $(SRC_DIR)/inj_fns/%.cu
 	$(NVCC) $(INCLUDES) $(MAXRREGCOUNT_FLAG) -Xptxas -astoolspatch --keep-device-functions -arch=$(ARCH) -Xcompiler -Wall -Xcompiler -fPIC -c $< -o $@
