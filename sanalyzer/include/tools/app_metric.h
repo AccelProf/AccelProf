@@ -37,22 +37,25 @@ private:
 /*
 ********************************* variables *********************************
 */
+    // NOTE: every scalar needs an initializer. With `Stats() = default` an
+    // uninitialized member holds garbage, which used to surface as absurd
+    // summary numbers (e.g. "Number of allocations: 1894568223" for 3 allocs).
     typedef struct Stats{
-        uint64_t num_allocs;
-        uint64_t num_kernels;
-        uint64_t cur_mem_usage;
-        uint64_t max_mem_usage;
-        uint64_t max_mem_accesses_per_kernel;
-        uint64_t avg_mem_accesses;
-        uint64_t tot_mem_accesses;
+        uint64_t num_allocs = 0;
+        uint64_t num_kernels = 0;
+        uint64_t cur_mem_usage = 0;
+        uint64_t max_mem_usage = 0;
+        uint64_t max_mem_accesses_per_kernel = 0;
+        uint64_t avg_mem_accesses = 0;
+        uint64_t tot_mem_accesses = 0;
         std::string max_mem_accesses_kernel;
-        uint64_t max_mem_access_kernel_id;
-        uint64_t max_objs_per_kernel;
-        uint64_t avg_objs_per_kernel;
-        uint64_t tot_objs_per_kernel;
-        uint64_t max_obj_size_per_kernel;
-        uint64_t avg_obj_size_per_kernel;
-        uint64_t tot_obj_size_per_kernel;
+        uint64_t max_mem_access_kernel_id = 0;
+        uint64_t max_objs_per_kernel = 0;
+        uint64_t avg_objs_per_kernel = 0;
+        uint64_t tot_objs_per_kernel = 0;
+        uint64_t max_obj_size_per_kernel = 0;
+        uint64_t avg_obj_size_per_kernel = 0;
+        uint64_t tot_obj_size_per_kernel = 0;
 
         Stats() = default;
 
