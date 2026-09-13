@@ -43,7 +43,11 @@ LDFLAGS += -L$(PYTHON_LIB_DIR)/../ -Wl,-rpath=$(PYTHON_LIB_DIR)/../
 LINK_LIBS += -lpython$(PYTHON_VERSION)
 
 
-CXX_FLAGS += -std=c++17
+# PyTorch >= 2.14 headers (c10/util/intrusive_ptr.h, ATen/core/TensorBase.h)
+# use std::strong_ordering and requires-clauses, which need C++20 and thus
+# gcc >= 10. Older torch/compiler pairs can override with CXX_STD=c++17.
+CXX_STD ?= c++20
+CXX_FLAGS += -std=$(CXX_STD)
 
 ifeq ($(DEBUG), 1)
 	CXX_FLAGS += -g
