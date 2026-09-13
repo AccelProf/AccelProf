@@ -40,11 +40,11 @@ OPT_LVL ?= 3
 ifeq ($(OPT_LVL), 0)
 	CXX_FLAGS += -O0
 else ifeq ($(OPT_LVL), 1)
-	CXX_FLAGS += -O1 -march=native
+	CXX_FLAGS += -O1
 else ifeq ($(OPT_LVL), 2)
-	CXX_FLAGS += -O2 -march=native
+	CXX_FLAGS += -O2
 else ifeq ($(OPT_LVL), 3)
-	CXX_FLAGS += -O3 -march=native
+	CXX_FLAGS += -O3
 else
     $(error Invalid OPT_LVL=$(OPT_LVL), expected 0,1,2,3)
 endif
