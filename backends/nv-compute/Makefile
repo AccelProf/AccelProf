@@ -22,8 +22,14 @@ NVCC_INCS      += -I$(CUDA_PATH)/include
 
 INCLUDES       += -I$(SANITIZER_PATH)/include
 NVCC_INCS      += -I$(SANITIZER_PATH)/include
-LDFLAGS        += -L$(SANITIZER_PATH)
+LDFLAGS        += -L$(SANITIZER_PATH) -Wl,-rpath=$(SANITIZER_PATH)
 LINK_LIBS      += -lsanitizer-public
+
+# The injection library calls into the CUDA runtime (cudaStreamCreateWithFlags,
+# cudaDeviceGetStreamPriorityRange, ...). Link it explicitly rather than relying
+# on another dependency to drag it in.
+LDFLAGS        += -L$(CUDA_PATH)/lib64 -Wl,-rpath=$(CUDA_PATH)/lib64
+LINK_LIBS      += -lcudart
 
 NVCC_FLAGS     += --fatbin --compile-as-tools-patch
 
