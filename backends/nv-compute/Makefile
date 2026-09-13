@@ -55,17 +55,32 @@ endif
 # architecture
 TARGET_ARCH   := $(shell uname -m)
 
+# Patch fatbins must carry SASS for the GPU being profiled. With only PTX for an
+# older arch present (e.g. compute_90 on an sm_120 card) the patch load fails:
+#     sanitizerAddPatchesFromFile(...) - error(999)
+# so the target architecture has to be in this list.
 ifeq ($(TARGET_ARCH),aarch64)
-    SMS        ?= 75 80 86 87 89 90
+    SMS_WANTED ?= 75 80 86 87 89 90 100 120
 else
-    SMS        ?= 75 80 86 89 90
+    SMS_WANTED ?= 75 80 86 89 90 100 120
+endif
+
+# Drop architectures the installed toolkit cannot generate (sm_100/sm_120 need
+# CUDA >= 12.8) so that one list works across toolkit versions.
+NVCC_ARCHS    := $(shell $(CUDA_PATH)/bin/nvcc --list-gpu-arch 2>/dev/null | sed 's/compute_//')
+ifeq ($(NVCC_ARCHS),)
+    SMS        ?= $(SMS_WANTED)
+else
+    SMS        ?= $(filter $(NVCC_ARCHS),$(SMS_WANTED))
 endif
 
 # Generate SASS code for each SM architecture listed in $(SMS)
 $(foreach sm,$(SMS),$(eval GENCODE_FLAGS += -gencode arch=compute_$(sm),code=sm_$(sm)))
 
-# Generate PTX code from the highest SM architecture in $(SMS) to guarantee forward-compatibility
-HIGHEST_SM     := $(lastword $(sort $(SMS)))
+# Generate PTX code from the highest SM architecture in $(SMS) to guarantee
+# forward-compatibility. Sorted numerically: $(sort) is lexicographic and would
+# rank 90 above 120.
+HIGHEST_SM     := $(shell printf '%s\n' $(SMS) | sort -n | tail -1)
 GENCODE_FLAGS  += -gencode arch=compute_$(HIGHEST_SM),code=compute_$(HIGHEST_SM)
 
 LIB_DIR        := lib
