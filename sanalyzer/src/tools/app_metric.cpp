@@ -121,6 +121,7 @@ void AppMetrics::flush() {
                 filename.c_str());
     }
     filename += ".log";
+    filename = resolve_output_path(filename);
     printf("Dumping traces to %s\n", filename.c_str());
 
     std::ofstream out(filename);

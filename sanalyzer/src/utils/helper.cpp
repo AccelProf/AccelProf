@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <ctime>
 #include <sys/stat.h>   // for folder creation
+#include <cstdlib>      // for getenv
 
 namespace yosemite {
 
@@ -69,6 +70,21 @@ std::string get_current_date_n_time() {
 
     // Convert the stringstream to string and return
     return ss.str();
+}
+
+std::string resolve_output_path(const std::string &name) {
+    if (!name.empty() && name[0] == '/') {
+        return name;
+    }
+    const char* result_dir = std::getenv("YOSEMITE_RESULT_DIR");
+    if (result_dir == nullptr || result_dir[0] == '\0') {
+        return name;
+    }
+    std::string base(result_dir);
+    while (base.size() > 1 && base.back() == '/') {
+        base.pop_back();
+    }
+    return base + "/" + name;
 }
 
 bool check_folder_existance(const std::string &folder) {

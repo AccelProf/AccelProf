@@ -40,7 +40,9 @@ Usage:
             - rocm (AMD ROCm)
     -b heatmap_analysis target block in x,y,z format.
     -o <output_directory>
-        Specify the output directory for results.
+        Specify the output directory for results (tool output and, with -v,
+        the accelprof log). Created if missing; defaults to the current
+        working directory.
     -w kernel_whitelist_file
         Specify the kernel whitelist file.
             - Example: ./kernel_whitelist.txt (each line in the file is a kernel name)
@@ -66,6 +68,8 @@ EOF
 # for debugging
 # set -x
 
+# Only -o sets this; do not inherit a stray RESULT_DIR from the environment.
+RESULT_DIR=""
 OPTION_STR=""
 while [ -n "$1" ]
 do
@@ -137,9 +141,12 @@ fi
 if [ ! -z ${RESULT_DIR} ]
 then
     echo "Result directory: ${RESULT_DIR}"
+    mkdir -p "${RESULT_DIR}" || error_hint "Cannot create result directory ${RESULT_DIR}"
 else
     export RESULT_DIR=$(pwd)
 fi
+# Tools resolve their relative output names against this (resolve_output_path).
+export YOSEMITE_RESULT_DIR=${RESULT_DIR}
 
 if [ "${DEVICE}" = "nvc" ]; then
     export YOSEMITE_DEVICE=nvc

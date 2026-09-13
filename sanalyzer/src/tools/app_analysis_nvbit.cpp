@@ -274,6 +274,7 @@ void AppAnalysisNVBIT::flush() {
     } else {
         fprintf(stdout, "No filename specified. Using default filename: %s\n", filename.c_str());
     }
+    filename = resolve_output_path(filename);
     printf("Dumping traces to %s\n", filename.c_str());
     
     FILE* out_fp = fopen(filename.c_str(), "w");

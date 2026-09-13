@@ -130,6 +130,7 @@ PcDependency::PcDependency() : Tool(PC_DEPENDENCY_ANALYSIS) {
     } else {
         output_directory = "dependency_" + get_current_date_n_time();
     }
+    output_directory = resolve_output_path(output_directory);
     check_folder_existance(output_directory);
 
     _worker_count = std::max(1u, read_env_u32("YOSEMITE_WORKER_COUNT", std::thread::hardware_concurrency()));

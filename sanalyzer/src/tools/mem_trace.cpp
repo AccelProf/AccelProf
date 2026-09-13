@@ -25,6 +25,7 @@ MemTrace::MemTrace() : Tool(MEM_TRACE) {
     } else {
         output_directory = "traces_" + get_current_date_n_time();
     }
+    output_directory = resolve_output_path(output_directory);
     check_folder_existance(output_directory);
 }
 

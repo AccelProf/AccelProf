@@ -327,7 +327,7 @@ void UVMAdvisor::print_callstack() {
 
 void UVMAdvisor::flush() {
     FILE* out;
-    std::string file_name = "uvm_advisor_opt.log";
+    std::string file_name = resolve_output_path("uvm_advisor_opt.log");
     out = fopen(file_name.c_str(), "w");
     
     fprintf(out, "--------------------------------------------------------------------------------\n");

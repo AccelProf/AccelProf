@@ -1,4 +1,5 @@
 #include "tools/event_trace_mgpu.h"
+#include "utils/helper.h"
 #include <cassert>
 #include <fstream>
 #include <string>
@@ -59,7 +60,7 @@ void EventTraceMGPU::flush() {
     std::string mem_file_name = "memory_gpu";
     for (auto &[device_id, size_list] : _memory_size_list) {
         PRINT("[YOSEMITE INFO] Memory size on device %d: ", device_id);
-        std::string mem_file_name = "memory_gpu_" + std::to_string(device_id) + ".txt";
+        std::string mem_file_name = resolve_output_path("memory_gpu_" + std::to_string(device_id) + ".txt");
         std::ofstream mem_file(mem_file_name);
         for (auto &size : size_list) {
             mem_file << size << std::endl;
@@ -68,7 +69,7 @@ void EventTraceMGPU::flush() {
     }
     // dump tensor size list
     for (auto &[device_id, size_list] : _tensor_size_list) {
-        std::string tensor_file_name = "tensor_gpu_" + std::to_string(device_id) + ".txt";
+        std::string tensor_file_name = resolve_output_path("tensor_gpu_" + std::to_string(device_id) + ".txt");
         std::ofstream tensor_file(tensor_file_name);
         for (auto &size : size_list) {
             tensor_file << size << std::endl;
