@@ -79,40 +79,6 @@ static inline uint32_t unpack_shadow_flat_tid(uint64_t packed) {
     return static_cast<uint32_t>(packed >> 32);
 }
 
-static inline const memory_region* find_memory_region_containing(
-    const std::vector<memory_region>& regions,
-    uint64_t addr
-) {
-    auto it = std::upper_bound(
-        regions.begin(),
-        regions.end(),
-        addr,
-        [](uint64_t value, const memory_region& region) {
-            return value < region.get_start();
-        }
-    );
-    if (it == regions.begin()) {
-        return nullptr;
-    }
-    --it;
-    return it->contains(addr) ? &(*it) : nullptr;
-}
-
-static uint32_t read_env_u32(const char* key, uint32_t default_value) {
-    const char* raw = std::getenv(key);
-    if (raw == nullptr) {
-        return default_value;
-    }
-    char* end_ptr = nullptr;
-    const unsigned long parsed = std::strtoul(raw, &end_ptr, 10);
-    if (end_ptr == raw || *end_ptr != '\0') {
-        return default_value;
-    }
-    if (parsed > std::numeric_limits<uint32_t>::max()) {
-        return default_value;
-    }
-    return static_cast<uint32_t>(parsed);
-}
 } // namespace
 
 
@@ -685,28 +651,8 @@ uint32_t PcDependency::acquire_shared_shadow_object(
     worker_shared_shadow_state& local_shadow_memory_shared,
     uint64_t cta_id
 ) {
-    const uint64_t local_slot_u64 = cta_id / _worker_count;
-    if (local_slot_u64 >= local_shadow_memory_shared.cta_slot_to_object.size()) {
-        local_shadow_memory_shared.cta_slot_to_object.resize(
-            static_cast<size_t>(local_slot_u64 + 1u),
-            worker_shared_shadow_state::k_invalid_object
-        );
-    }
-    const uint32_t local_slot = static_cast<uint32_t>(local_slot_u64);
-    const uint32_t mapped_object = local_shadow_memory_shared.cta_slot_to_object[local_slot];
-    if (mapped_object != worker_shared_shadow_state::k_invalid_object) {
-        return mapped_object;
-    }
-    if (local_shadow_memory_shared.free_object_indices.empty()) {
-        local_shadow_memory_shared.pool_miss_count += 1;
-        return std::numeric_limits<uint32_t>::max();
-    }
-    const uint32_t object_idx = local_shadow_memory_shared.free_object_indices.back();
-    local_shadow_memory_shared.free_object_indices.pop_back();
-    local_shadow_memory_shared.object_owner_cta[object_idx] = cta_id;
-    local_shadow_memory_shared.object_active_threads[object_idx] = _current_block_thread_count;
-    local_shadow_memory_shared.cta_slot_to_object[local_slot] = object_idx;
-    return object_idx;
+    return yosemite::acquire_shared_shadow_object(
+        local_shadow_memory_shared, cta_id, _worker_count, _current_block_thread_count);
 }
 
 void PcDependency::release_shared_shadow_object(
@@ -714,25 +660,8 @@ void PcDependency::release_shared_shadow_object(
     uint64_t cta_id,
     uint32_t exiting_threads
 ) {
-    const uint64_t local_slot_u64 = cta_id / _worker_count;
-    if (local_slot_u64 >= local_shadow_memory_shared.cta_slot_to_object.size()) {
-        return;
-    }
-    const uint32_t local_slot = static_cast<uint32_t>(local_slot_u64);
-    const uint32_t object_idx = local_shadow_memory_shared.cta_slot_to_object[local_slot];
-    if (object_idx == worker_shared_shadow_state::k_invalid_object) {
-        return;
-    }
-    uint32_t& active_threads = local_shadow_memory_shared.object_active_threads[object_idx];
-    if (active_threads > exiting_threads) {
-        active_threads -= exiting_threads;
-        return;
-    }
-    active_threads = 0;
-    local_shadow_memory_shared.cta_slot_to_object[local_slot] = worker_shared_shadow_state::k_invalid_object;
-    local_shadow_memory_shared.object_owner_cta[object_idx] = std::numeric_limits<uint64_t>::max();
-    local_shadow_memory_shared.object_active_threads[object_idx] = 0u;
-    local_shadow_memory_shared.free_object_indices.push_back(object_idx);
+    yosemite::release_shared_shadow_object(
+        local_shadow_memory_shared, cta_id, exiting_threads, _worker_count);
 }
 
 shared_shadow_memory_entry& PcDependency::get_shared_shadow_entry(
@@ -740,8 +669,8 @@ shared_shadow_memory_entry& PcDependency::get_shared_shadow_entry(
     uint32_t object_idx,
     uint32_t addr
 ) {
-    assert(addr < _shared_shadow_bytes_per_object);
-    return local_shadow_memory_shared.object_entries[object_idx][addr];
+    return yosemite::get_shared_shadow_entry(
+        local_shadow_memory_shared, object_idx, addr, _shared_shadow_bytes_per_object);
 }
 
 void PcDependency::unit_access_local(uint64_t ptr, uint32_t pc_offset, uint64_t current_block_id, uint32_t current_warp_id, uint32_t current_lane_id, int access_size) {
