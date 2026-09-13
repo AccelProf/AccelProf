@@ -6,28 +6,11 @@ if [ ! -f "${ACCEL_PROF_DIR}/bin/clean" ]; then
     exit 1
 fi
 
-GIT_PATH_LIST=(
-    $ACCEL_PROF_DIR/
-    $ACCEL_PROF_DIR/docs
-    $ACCEL_PROF_DIR/nv-compute
-    $ACCEL_PROF_DIR/nv-nvbit
-    $ACCEL_PROF_DIR/amd-rocm
-    $ACCEL_PROF_DIR/tensor_scope
-    $ACCEL_PROF_DIR/sanalyzer
-    $ACCEL_PROF_DIR/sanalyzer/cpp_trace
-    $ACCEL_PROF_DIR/sanalyzer/py_frame
-)
-BRANCH_LIST=(
-    main
-    main
-    main
-    main
-    main
-    main
-    main
-    main
-    main
-)
+# The GPU backends (nv-compute, nv-nvbit, amd-rocm), tensor_scope, sanalyzer and
+# its cpp_trace/py_frame sub-projects used to be first-party submodules. They are
+# now inlined into this repository, so only this repository and the third_party
+# submodules are separate git trees.
+BRANCH=${1:-main}
 
 check_git_clean() {
   # Check for uncommitted changes
@@ -47,25 +30,16 @@ check_git_clean() {
   echo "✅ Git repository is clean and fully pushed."
 }
 
-# check git clean
-for path in ${GIT_PATH_LIST[@]}; do
-    cd $path
-    echo "🔍 Checking git status in $(basename "$path")"
-    check_git_clean
-done
+cd "$ACCEL_PROF_DIR"
+echo "🔍 Checking git status in $(basename "$ACCEL_PROF_DIR")"
+check_git_clean
 
-cd $ACCEL_PROF_DIR
-git submodule sync
-git submodule update --init --recursive
-# git submodule update --remote --recursive
+echo "✅ Syncing $(basename "$ACCEL_PROF_DIR") to $BRANCH"
+git checkout -q "$BRANCH" || exit 1
+git pull -q || exit 1
 
-for i in ${!GIT_PATH_LIST[@]}; do
-    path=${GIT_PATH_LIST[$i]}
-    branch=${BRANCH_LIST[$i]}
-    echo "✅ Syncing $(basename "$path") to $branch"
-    cd $path
-    git checkout $branch &> /dev/null
-    git pull &> /dev/null
-done
+# third_party pins follow whatever the freshly pulled commit records
+git submodule sync --recursive || exit 1
+git submodule update --init --recursive || exit 1
 
 echo "✅ Syncing done"
