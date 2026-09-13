@@ -62,9 +62,9 @@ typedef std::shared_ptr<Event> EventPtr_t;
 
 
 typedef struct KernelLaunch : public Event {
-    uint64_t end_time;
+    uint64_t end_time = 0;
     std::string kernel_name;
-    uint32_t kernel_id;
+    uint32_t kernel_id = 0;
     uint32_t grid_dim_x;
     uint32_t grid_dim_y;
     uint32_t grid_dim_z;
@@ -73,11 +73,11 @@ typedef struct KernelLaunch : public Event {
     uint32_t block_dim_y;
     uint32_t block_dim_z;
     uint32_t block_thread_count;
-    uint64_t access_count;
-    uint32_t touched_objects;
-    uint32_t touched_objects_size;
-    uint64_t key;   // for UVM Advisor
-    uint64_t kernel_pc;
+    uint64_t access_count = 0;
+    uint32_t touched_objects = 0;
+    uint32_t touched_objects_size = 0;
+    uint64_t key = 0;   // for UVM Advisor
+    uint64_t kernel_pc = 0;
 
     KernelLaunch() {
         this->evt_type = EventType_KERNEL_LAUNCH;
