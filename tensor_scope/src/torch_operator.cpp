@@ -1,4 +1,5 @@
 #include "torch_operator.h"
+#include "torch_tensor.h"
 
 struct OperatorCallbackContext : at::ObserverContext {
     std::string op_name;
@@ -27,6 +28,9 @@ void TorchOperator::register_operator_callback(TorchScopeType_t scope_type,
 }
 
 std::unique_ptr<at::ObserverContext> TorchOperator::operator_start_callback(const at::RecordFunction& fn) {
+    // Op start is outside the caching-allocator lock, and by the first CUDA op
+    // the allocator has been initialized: the right moment to hook it.
+    TorchTensor::ensure_tracker_attached();
     if (getInstance().operator_start_callback_ptr == nullptr) {
         printf("operator_start_callback_ptr is nullptr\n");
     }

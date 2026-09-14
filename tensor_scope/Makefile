@@ -28,11 +28,18 @@ LINK_LIBS += -lc10 -ltorch -ltorch_cpu
 
 # --- Add CUDA (or HIP) component if present
 # Try torch_cuda first; if not found, try torch_hip (ROCm)
+# The caching-allocator trace hook lives in c10_cuda / c10_hip, and its header
+# includes the vendor runtime header, hence the runtime include path.
+CUDA_PATH ?= /usr/local/cuda
+ROCM_PATH ?= /opt/rocm
 ifneq ("$(wildcard $(TORCH_DIR)/lib/libtorch_cuda.so)","")
+  INCLUDES  += -I$(CUDA_PATH)/include
   LINK_LIBS += -ltorch_cuda -lc10_cuda
 endif
 ifneq ("$(wildcard $(TORCH_DIR)/lib/libtorch_hip.so)","")
-  LINK_LIBS += -ltorch_hip
+  INCLUDES  += -I$(ROCM_PATH)/include
+  CXX_FLAGS += -DTORCH_SCOPE_ROCM
+  LINK_LIBS += -ltorch_hip -lc10_hip
 endif
 
 PYTHON_INCLUDE_DIR = $(shell python3 -c "import sysconfig; print(sysconfig.get_path('include'))")
