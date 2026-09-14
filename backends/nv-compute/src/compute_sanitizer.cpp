@@ -311,6 +311,16 @@ void buffer_init(CUcontext context) {
             SANITIZER_SAFECALL(
                 sanitizerAllocHost(context, (void**)&host_access_state, sizeof(MemoryAccessState)));
         }
+    } else if (sanitizer_options.patch_name == GPU_PATCH_HOT_ANALYSIS) {
+        // Same per-range touch state as app_metric; LaunchBegin memsets and
+        // uploads it, LaunchEnd copies it back.
+        if (!device_access_state)
+            SANITIZER_SAFECALL(
+                sanitizerAlloc(context, (void**)&device_access_state, sizeof(MemoryAccessState)));
+        if (!host_access_state) {
+            SANITIZER_SAFECALL(
+                sanitizerAllocHost(context, (void**)&host_access_state, sizeof(MemoryAccessState)));
+        }
     } else if (sanitizer_options.patch_name == GPU_PATCH_ROOFLINE_SIZE) {
         // no functions needed
     } else if (sanitizer_options.patch_name == GPU_PATCH_MEM_TRACE) {
