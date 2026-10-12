@@ -60,6 +60,9 @@ Full user and developer documentation:
 - **[CGO’26]** *PASTA: A Modular Program Analysis Tool Framework for Accelerators.*  
   Mao Lin, Hyeran Jeon, and Keren Zhou.  
   Proceedings of the 23rd ACM/IEEE International Symposium on Code Generation and Optimization (CGO 2026).
+- **[ICCD’26]** *AutoUVM: Automated Prefetching Framework for LLMs under UVM Oversubscription.*  
+  Mao Lin, Hui Feng, Xianzhong Ding, Guilherme Cox, Qian Wang, Hyeran Jeon.  
+  Proceedings of the 44th IEEE International Conference on Computer Design (ICCD 2026).
 
 ## License
 
