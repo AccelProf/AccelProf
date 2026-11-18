@@ -42,7 +42,11 @@ typedef enum EventType {
     EventType_TEN_FREE = 7,
     EventType_OP_START = 8,
     EventType_OP_END = 9,
-    EventTypeCount = 10,
+    EventType_RANGE_PUSH = 10,
+    EventType_RANGE_POP = 11,
+    EventType_API_LAUNCH = 12,
+    EventType_GPU_ACTIVITY = 13,
+    EventTypeCount = 14,
 }EventType_t;
 
 
@@ -294,6 +298,87 @@ typedef struct OpEnd : public Event {
 
     ~OpEnd() = default;
 }OpEnd_t;
+
+// A named CPU-side range, e.g. an NVTX push. `timestamp` is the push time.
+typedef struct RangePush : public Event {
+    std::string name;
+    uint64_t thread_id;
+
+    RangePush() {
+        evt_type = EventType_RANGE_PUSH;
+    }
+
+    RangePush(std::string name, uint64_t thread_id, uint64_t timestamp)
+        : name(name), thread_id(thread_id) {
+            evt_type = EventType_RANGE_PUSH;
+            this->timestamp = timestamp;
+        }
+
+    ~RangePush() = default;
+}RangePush_t;
+
+// Closes the innermost open range of `thread_id`. `timestamp` is the pop time.
+typedef struct RangePop : public Event {
+    uint64_t thread_id;
+
+    RangePop() {
+        evt_type = EventType_RANGE_POP;
+    }
+
+    RangePop(uint64_t thread_id, uint64_t timestamp)
+        : thread_id(thread_id) {
+            evt_type = EventType_RANGE_POP;
+            this->timestamp = timestamp;
+        }
+
+    ~RangePop() = default;
+}RangePop_t;
+
+// A CPU-side call that puts work on the GPU (kernel launch, memcpy, memset).
+// It is reported on the calling thread, at call time, so it can be matched
+// with the range that is open at that moment.
+// `correlation_id` links this call to the GpuActivity it produces.
+typedef struct ApiLaunch : public Event {
+    uint64_t correlation_id;
+    uint64_t thread_id;
+
+    ApiLaunch() {
+        evt_type = EventType_API_LAUNCH;
+    }
+
+    ApiLaunch(uint64_t correlation_id, uint64_t thread_id, uint64_t timestamp)
+        : correlation_id(correlation_id), thread_id(thread_id) {
+            evt_type = EventType_API_LAUNCH;
+            this->timestamp = timestamp;
+        }
+
+    ~ApiLaunch() = default;
+}ApiLaunch_t;
+
+// Work that ran on the GPU (kernel, memcpy, memset), with GPU start/end time.
+// It arrives later than the ApiLaunch that produced it, possibly from another thread.
+typedef struct GpuActivity : public Event {
+    uint64_t correlation_id;
+    std::string name;
+    uint32_t stream_id;
+    uint64_t start;
+    uint64_t end;
+
+    GpuActivity() {
+        evt_type = EventType_GPU_ACTIVITY;
+    }
+
+    GpuActivity(uint64_t correlation_id, std::string name, int device_id,
+                uint32_t stream_id, uint64_t start, uint64_t end)
+        : correlation_id(correlation_id), name(name), stream_id(stream_id),
+          start(start), end(end) {
+            evt_type = EventType_GPU_ACTIVITY;
+            this->device_id = device_id;
+            this->timestamp = start;
+        }
+
+    ~GpuActivity() = default;
+}GpuActivity_t;
 
 }   // yosemite
 

@@ -34,6 +34,7 @@ mkdir -p $ACCEL_PROF_DIR/build
 : "${ENABLE_NVBIT_BACKEND:=0}"
 : "${ENABLE_AMD_ROCM_BACKEND:=0}"
 : "${ENABLE_TORCH_MONITOR_BACKEND:=0}"
+: "${ENABLE_CUPTI_BACKEND:=0}"
 
 
 # check build env
@@ -99,6 +100,16 @@ if [ $ENABLE_NVBIT_BACKEND -eq 1 ]; then
                          TORCH_SCOPE_DIR=$ACCEL_PROF_DIR/build/tensor_scope
 
     cp $ACCEL_PROF_DIR/backends/nv-nvbit/lib/*.so $ACCEL_PROF_DIR/lib/
+fi
+
+
+# build nv-cupti
+if [ $ENABLE_CUPTI_BACKEND -eq 1 ]; then
+    cd $ACCEL_PROF_DIR/backends/nv-cupti
+    make -j DEBUG=$DEBUG OPT_LVL=$OPT_LVL \
+                         SANALYZER_DIR=$ACCEL_PROF_DIR/build/sanalyzer
+
+    cp $ACCEL_PROF_DIR/backends/nv-cupti/lib/*.so $ACCEL_PROF_DIR/lib/
 fi
 
 

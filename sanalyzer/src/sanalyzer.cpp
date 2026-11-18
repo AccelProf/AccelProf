@@ -19,6 +19,7 @@
 #include "tools/heatmap_analysis.h"
 #include "tools/block_divergence_analysis.h"
 #include "tools/pc_dependency_analysis.h"
+#include "tools/range_time.h"
 
 #include <memory>
 #include <map>
@@ -67,6 +68,21 @@ YosemiteResult_t yosemite_tool_enable(AnalysisTool_t& tool) {
             return YOSEMITE_NOT_IMPLEMENTED;
         }
         fprintf(stdout, "[SANALYZER INFO] Enabling %s tool in rocm mode.\n", tool_name);
+        fflush(stdout);
+        return YOSEMITE_SUCCESS;
+    }
+
+    // cupti mode
+    if (std::string(yosemite_device_name) == "cupti") {
+        if (std::string(tool_name) == "range_time") {
+            tool = RANGE_TIME;
+            _tools.emplace(RANGE_TIME, std::make_shared<RangeTime>());
+        } else {
+            fprintf(stderr, "[SANALYZER ERROR] Unsupported tool in cupti mode, %s.\n", tool_name);
+            fflush(stderr);
+            return YOSEMITE_NOT_IMPLEMENTED;
+        }
+        fprintf(stdout, "[SANALYZER INFO] Enabling %s tool in cupti mode.\n", tool_name);
         fflush(stdout);
         return YOSEMITE_SUCCESS;
     }
@@ -289,6 +305,8 @@ YosemiteResult_t yosemite_init(AccelProfOptions_t& options) {
         // backends/nv-compute/Makefile generates fatbins based on gpu_src/*.cu filenames.
         // The source file for this tool is backends/nv-compute/gpu_src/gpu_patch_pc_dependency.cu
         options.patch_file = "gpu_patch_pc_dependency.fatbin";
+    } else if (tool == RANGE_TIME) {
+        options.patch_name = GPU_NO_PATCH;
     }
 
     // enable torch profiler?
@@ -367,6 +385,43 @@ YosemiteResult_t yosemite_query_active_ranges(void* ranges, uint32_t limit, uint
 YosemiteResult_t yosemite_query_active_tensors(void* ranges, uint32_t limit, uint32_t* count) {
     for (auto &tool : _tools) {
         tool.second->query_tensors(ranges, limit, count);
+    }
+    return YOSEMITE_SUCCESS;
+}
+
+
+YosemiteResult_t yosemite_range_push_callback(std::string name, uint64_t thread_id, uint64_t timestamp) {
+    for (auto &tool : _tools) {
+        auto range = std::make_shared<RangePush_t>(name, thread_id, timestamp);
+        tool.second->evt_callback(range);
+    }
+    return YOSEMITE_SUCCESS;
+}
+
+
+YosemiteResult_t yosemite_range_pop_callback(uint64_t thread_id, uint64_t timestamp) {
+    for (auto &tool : _tools) {
+        auto range = std::make_shared<RangePop_t>(thread_id, timestamp);
+        tool.second->evt_callback(range);
+    }
+    return YOSEMITE_SUCCESS;
+}
+
+
+YosemiteResult_t yosemite_api_launch_callback(uint64_t correlation_id, uint64_t thread_id, uint64_t timestamp) {
+    for (auto &tool : _tools) {
+        auto launch = std::make_shared<ApiLaunch_t>(correlation_id, thread_id, timestamp);
+        tool.second->evt_callback(launch);
+    }
+    return YOSEMITE_SUCCESS;
+}
+
+
+YosemiteResult_t yosemite_gpu_activity_callback(uint64_t correlation_id, std::string name, int device_id,
+                                                uint32_t stream_id, uint64_t start, uint64_t end) {
+    for (auto &tool : _tools) {
+        auto activity = std::make_shared<GpuActivity_t>(correlation_id, name, device_id, stream_id, start, end);
+        tool.second->evt_callback(activity);
     }
     return YOSEMITE_SUCCESS;
 }

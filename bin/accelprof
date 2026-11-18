@@ -32,12 +32,14 @@ Usage:
         uvm_advisor: Analyze UVM memory access patterns.
         event_trace: Trace AMD GPU events.
         event_trace_mgpu: Trace multi-GPU events.
+        range_time: GPU time of each NVTX range (use with -d cupti).
     -d <device_name>
         Specify the device vendor name.
         Valid values:
             - nvc (NVIDIA Compute Sanitizer, default)
             - nvbit (NVIDIA nvbit)
             - rocm (AMD ROCm)
+            - cupti (NVIDIA CUPTI)
     -b heatmap_analysis target block in x,y,z format.
     -o <output_directory>
         Specify the output directory for results.
@@ -147,6 +149,8 @@ elif [ "${DEVICE}" = "nvbit" ]; then
     export YOSEMITE_DEVICE=nvbit
 elif [ "${DEVICE}" = "rocm" ]; then
     export YOSEMITE_DEVICE=rocm
+elif [ "${DEVICE}" = "cupti" ]; then
+    export YOSEMITE_DEVICE=cupti
 else
     export YOSEMITE_DEVICE=nvc
 fi
@@ -214,6 +218,9 @@ then
 elif [ ${TOOL} == "event_trace_mgpu" ]
 then
     export YOSEMITE_TOOL_NAME=event_trace_mgpu
+elif [ ${TOOL} == "range_time" ]
+then
+    export YOSEMITE_TOOL_NAME=range_time
 elif [ ${TOOL} == "heatmap_analysis" ]
 then
     export YOSEMITE_TOOL_NAME=heatmap_analysis
@@ -274,6 +281,15 @@ then
 elif [ ${YOSEMITE_DEVICE} == "rocm" ]
 then
     LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/librocm_callback.so
+elif [ ${YOSEMITE_DEVICE} == "cupti" ]
+then
+    LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/libnv-cupti.so
+    # NVTX sends its ranges to CUPTI only if NVTX_INJECTION64_PATH points to libcupti.so.
+    # Use the same libcupti that libnv-cupti.so is linked against.
+    export NVTX_INJECTION64_PATH=$(ldd ${LD_PRELOAD_LIB} | awk '/libcupti\.so/ {print $3; exit}')
+    if [ -z "${NVTX_INJECTION64_PATH}" ]; then
+        echo "Warning: libcupti.so not found by ldd ${LD_PRELOAD_LIB}, NVTX ranges will not be recorded."
+    fi
 else
     LD_PRELOAD_LIB=${ACCEL_PROF_HOME}/lib/libcompute_sanitizer.so
 fi

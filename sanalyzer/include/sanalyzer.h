@@ -85,5 +85,18 @@ YosemiteResult_t yosemite_query_active_ranges(void* ranges, uint32_t limit, uint
 
 YosemiteResult_t yosemite_query_active_tensors(void* ranges, uint32_t limit, uint32_t* count);
 
+// Range / timing events (used by the nv-cupti backend).
+YosemiteResult_t yosemite_range_push_callback(std::string name, uint64_t thread_id, uint64_t timestamp);
+
+YosemiteResult_t yosemite_range_pop_callback(uint64_t thread_id, uint64_t timestamp);
+
+YosemiteResult_t yosemite_api_launch_callback(uint64_t correlation_id, uint64_t thread_id, uint64_t timestamp);
+
+YosemiteResult_t yosemite_gpu_activity_callback(uint64_t correlation_id, std::string name, int device_id,
+                                                uint32_t stream_id, uint64_t start, uint64_t end);
+
+// Ask all tools to write their results now (e.g., at cudaProfilerStop).
+YosemiteResult_t yosemite_flush();
+
 
 #endif // YOSEMITE_H
