@@ -28,7 +28,17 @@
 #include "sanalyzer.h"
 
 #include <cupti.h>
-#include <generated_nvtx_meta.h>    // parameter structs of NVTX callbacks
+
+// CUpti_ActivityMemcpy6 first appears in CUDA 12.8 (CUPTI API version 26).
+#if CUPTI_API_VERSION < 26
+#error "nv-cupti needs CUDA >= 12.8. Set CUDA_PATH to the CUDA used by the app (e.g. cuda-13.0)."
+#endif
+
+// generated_nvtx_meta.h has the parameter structs of NVTX callbacks.
+// Older CUDA versions (e.g. 12.1) do not include the NVTX headers it needs.
+#include <nvtx3/nvToolsExt.h>
+#include <nvtx3/nvToolsExtSync.h>
+#include <generated_nvtx_meta.h>
 
 #include <atomic>
 #include <cstdio>

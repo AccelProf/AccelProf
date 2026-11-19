@@ -6,13 +6,13 @@ The `range_time` tool turns them into "GPU time spent in each range".
 
 ## Requirements
 
-* CUDA >= 12.0 (developed against CUDA 13.0 headers; uses `CUpti_ActivityKernel10` on 13.x, `Kernel9` on 12.x)
+* CUDA >= 12.8 (compiled against 12.8, 12.9 and 13.0 headers; uses `CUpti_ActivityKernel10` on 13.x, `Kernel9` on 12.x)
 * Linux
 
 ## Build
 
 ```bash
-export CUDA_PATH=/path/to/cuda-13.0      # must match the CUDA of the app (e.g. torch cu130)
+export CUDA_PATH=/path/to/cuda-13.0      # must match the CUDA of the app (e.g. torch cu130); default is /usr/local/cuda
 make ENABLE_CUPTI=1
 ldd lib/libnv-cupti.so | grep cupti      # check which libcupti it uses
 ```

@@ -5,6 +5,7 @@ include $(CONFIGS)
 
 # CUPTI is usually in $(CUDA_PATH)/extras/CUPTI; some installs put it in $(CUDA_PATH) directly.
 CUPTI_PATH     ?= $(if $(wildcard $(CUDA_PATH)/extras/CUPTI/include/cupti.h),$(CUDA_PATH)/extras/CUPTI,$(CUDA_PATH))
+$(info [nv-cupti] CUDA_PATH=$(CUDA_PATH) CUPTI_PATH=$(CUPTI_PATH))
 
 CXX            ?= g++
 
