@@ -16,6 +16,9 @@ make clean
 cd $ACCEL_PROF_DIR/backends/nv-nvbit
 make clean
 
+cd $ACCEL_PROF_DIR/backends/nv-cupti
+make clean
+
 cd $ACCEL_PROF_DIR/tensor_scope
 make clean
 

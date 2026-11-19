@@ -93,13 +93,13 @@ CUPTI thread: kernel record (GPU start/end, correlation id) ──► yosemite_g
 
 ## Test
 
-See `tests/nv-cupti/`:
+See `tests/nv-cupti/` (a 2-layer gate/topk/up loop with one NVTX range per op):
 
 ```bash
 cd tests/nv-cupti
 ACCELPROF_CUPTI_CAPTURE=profiler_api accelprof -v -d cupti -t range_time python mlp_ranges.py
-python check_expected.py --app mlp_ranges --procs 1
+python check_expected.py mlp_ranges
 
 ACCELPROF_CUPTI_CAPTURE=profiler_api accelprof -v -d cupti -t range_time python mlp_ranges_mp.py
-python check_expected.py --app mlp_ranges_mp --procs 2
+python check_expected.py mlp_ranges_mp 2
 ```
